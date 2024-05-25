@@ -1,5 +1,8 @@
 import math
 from random import random as rand
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pygame
 import sympy as sp
 from OpenGL.GL import *
@@ -21,7 +24,7 @@ shape_points = [
     (0, 1, 0),
     (0, 0, 1),
     (0, 0, 0),
-    (2, 1, -1)
+    (2, 1, 1)
 ]
 
 shape_edges = [
@@ -33,7 +36,7 @@ shape_edges = [
     (1, 3),
     (4, 0),
     (4, 1),
-    (4, 3),
+    (4, 2),
 ]
 plane_size = 2
 plane_x = 1
@@ -89,6 +92,7 @@ def calculate_intersection(a, b, plane):
 
     return None
 
+
 intersections = []
 for edge in shape_edges:
     a = shape_points[edge[0]]
@@ -97,8 +101,6 @@ for edge in shape_edges:
     if intersection:
         intersections.append(intersection)
 
-print("Found intersections: ", intersections)
-
 # Camera position and rotation
 camera_x, camera_y, camera_z = 0.5, 0.5, 5.0
 camera_rotation_x, camera_rotation_y = 45, -45
@@ -106,6 +108,23 @@ camera_rotation_x, camera_rotation_y = 45, -45
 # Mouse motion variables
 last_x, last_y = 0, 0
 mouse_down = False
+
+
+def convert_to_plane_coordinates(intersection_point, plane_origin, angle):
+    p_prime = np.array(intersection_point) - np.array(plane_origin)
+
+    u_prime = np.dot(p_prime, (0, 0, 1))
+    v_prime = np.dot(p_prime, (math.cos(angle), math.sin(angle), 0))
+
+    return u_prime, v_prime
+
+
+converted_coords = []
+for intersection in intersections:
+    print("Intersection point: ", intersection)
+    coord = convert_to_plane_coordinates(intersection, (plane_x, plane_y, 0), plane_angle)
+    converted_coords.append(coord)
+    print("2D coordinates: ", coord)
 
 
 def draw_sphere(center, radius=0.025):
@@ -121,6 +140,7 @@ def draw_sphere(center, radius=0.025):
     gluDeleteQuadric(quadric)
     glPopMatrix()
 
+
 def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
     glBegin(GL_LINES)
     glColor3f(*color)
@@ -128,6 +148,7 @@ def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
         for vertex in edge:
             glVertex3fv(points[vertex])
     glEnd()
+
 
 def draw():
     global camera_x, camera_y, camera_z, camera_rotation_x, camera_rotation_y
@@ -192,7 +213,15 @@ while running:
 
 pygame.quit()
 
-# print(calculate_intersection((1, 2, 2), (-1, 0, 0), {"x": -1.4, "y": 0.3, "angle": 0.65}))
-# find points of intersection between the plane and the shape
+# Plot projected 2D coordinates
+fig, ax = plt.subplots()
+ax.set_aspect('equal')
+ax.set_xlim(-4, 4)
+ax.set_ylim(-4, 4)
+ax.axhline(0, color='black', lw=0.5)
+ax.axvline(0, color='black', lw=0.5)
 
+for coord in converted_coords:
+    ax.scatter(*coord)
 
+plt.show()
