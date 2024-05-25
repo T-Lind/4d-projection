@@ -1,16 +1,11 @@
-# Displays the object/points of intersection and plane in 3D, then plots the 2D coordinates of the intersection points
-# on the plane and the convex hull of the points.
-
-from random import random as rand
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pygame
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from pygame.locals import *
 from scipy.spatial import ConvexHull
-from v1.helper import calculate_intersection, convert_to_plane_coordinates, draw_sphere, draw_shape
+
+from v1.helper import calculate_intersection, convert_to_plane_coordinates
 
 # Initialize Pygame
 pygame.init()
@@ -19,8 +14,10 @@ pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
 
 # Set up OpenGL perspective
 glMatrixMode(GL_PROJECTION)
-gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+glLoadIdentity()
+glOrtho(0, display[0], 0, display[1], -1, 1)
 glMatrixMode(GL_MODELVIEW)
+
 
 shape_points = [
     (1, 0, 0),
@@ -68,10 +65,6 @@ for edge in shape_edges:
     if intersection:
         intersections.append(intersection)
 
-# Camera position and rotation
-camera_x, camera_y, camera_z = 0.5, 0.5, 5.0
-camera_rotation_x, camera_rotation_y = 45, -45
-
 # Mouse motion variables
 last_x, last_y = 0, 0
 mouse_down = False
@@ -80,24 +73,25 @@ converted_coords = []
 for intersection in intersections:
     coord = convert_to_plane_coordinates(intersection, (plane_x, plane_y, 0), plane_angle)
     converted_coords.append(coord)
+converted_edges = []
+
+
+def drawLine(start, end, color):
+    glBegin(GL_LINES)
+    glColor3fv(color)
+    glVertex2fv(start)
+    glVertex2fv(end)
+    glEnd()
 
 
 def draw():
-    global camera_x, camera_y, camera_z, camera_rotation_x, camera_rotation_y
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
 
-    # Set camera position and rotation
-    glTranslatef(-camera_x, -camera_y, -camera_z)
-    glRotatef(camera_rotation_x, 1, 0, 0)
-    glRotatef(camera_rotation_y, 0, 1, 0)
-
-    draw_shape(shape_points, shape_edges)
-    draw_shape(plane_points, plane_edges, (1.0, 0.0, 0.0))
-
-    for intersection in intersections:
-        glColor3f(rand(), rand(), rand())
-        draw_sphere(intersection)
+    # Draw the convex hull (2D)
+    for edge in converted_edges:
+        drawLine((converted_coords[edge[0]][0] * 100 + 200, converted_coords[edge[0]][1] * 100 + 200),
+                 (converted_coords[edge[1]][0] * 100 + 200, converted_coords[edge[1]][1] * 100 + 200), (0, 1, 0))
 
     pygame.display.flip()
 
@@ -114,8 +108,9 @@ def handle_mouse_motion(x, y):
 
     last_x, last_y = x, y
 
+
 def update():
-    global plane_x, plane_y, plane_angle, plane_points, intersections, converted_coords
+    global plane_x, plane_y, plane_angle, plane_points, intersections, converted_coords, converted_edges
     # Update the plane points based on the new angle
     plane_points = [
         (plane_x + plane_size * np.cos(plane_angle), plane_y + plane_size * np.sin(plane_angle), -1),
@@ -138,80 +133,41 @@ def update():
         coord = convert_to_plane_coordinates(intersection, (plane_x, plane_y, 0), plane_angle)
         converted_coords.append(coord)
 
+    hull = ConvexHull(converted_coords)
+
+    converted_edges = []
+    for i in range(len(hull.vertices) - 1):
+        converted_edges.append((hull.vertices[i], hull.vertices[i + 1]))
+
+    converted_edges.append((hull.vertices[-1], hull.vertices[0]))
+
+
 
 # Main loop
+update()
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left mouse button
-                mouse_down = True
-                last_x, last_y = event.pos
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:  # Left mouse button
-                mouse_down = False
-        elif event.type == pygame.MOUSEMOTION:
-            handle_mouse_motion(event.pos[0], event.pos[1])
         elif event.type == pygame.KEYDOWN:
             # Move the camera with the WASD keys
-            if event.key == pygame.K_w:
-                camera_z -= 0.25
-            if event.key == pygame.K_s:
-                camera_z += 0.25
-            if event.key == pygame.K_a:
-                camera_x -= 0.25
-            if event.key == pygame.K_d:
-                camera_x += 0.25
-
-            # i/j/k/l controls x/y of plane
-            if event.key == pygame.K_i:
-                plane_y += 0.25
+            if event.key in [pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d]:
+                if event.key == pygame.K_w:
+                    plane_y -= 0.25
+                if event.key == pygame.K_s:
+                    plane_y += 0.25
+                if event.key == pygame.K_a:
+                    plane_x -= 0.25
+                if event.key == pygame.K_d:
+                    plane_x += 0.25
                 update()
-            if event.key == pygame.K_k:
-                plane_y -= 0.25
-                update()
-            if event.key == pygame.K_j:
-                plane_x -= 0.25
-                update()
-            if event.key == pygame.K_l:
-                plane_x += 0.25
-                update()
-
         elif event.type == pygame.MOUSEWHEEL:
             # Update the plane angle based on the mouse wheel scroll
             plane_angle += event.y * np.pi / 48
             plane_angle %= 2 * np.pi  # Keep the angle within 0 to 2π
             update()
 
-
     draw()
 
 pygame.quit()
-
-# Plot projected 2D coordinates
-fig, ax = plt.subplots()
-ax.set_aspect('equal')
-ax.set_xlim(-4, 4)
-ax.set_ylim(-4, 4)
-ax.axhline(0, color='black', lw=0.5)
-ax.axvline(0, color='black', lw=0.5)
-
-for coord in converted_coords:
-    ax.scatter(*coord)
-
-hull = ConvexHull(converted_coords)
-
-edges = []
-for i in range(len(hull.vertices) - 1):
-    edges.append((hull.vertices[i], hull.vertices[i + 1]))
-
-edges.append((hull.vertices[-1], hull.vertices[0]))
-
-for edge in edges:
-    from_vertex = converted_coords[edge[0]]
-    to_vertex = converted_coords[edge[1]]
-    ax.plot([from_vertex[0], to_vertex[0]], [from_vertex[1], to_vertex[1]], 'r')
-
-plt.show()
