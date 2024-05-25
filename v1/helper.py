@@ -65,8 +65,21 @@ def draw_sphere(center, radius=0.025):
 
 def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
     glBegin(GL_LINES)
-    glColor3f(*color)
+    glColor3f(*color[:3])
     for edge in edges:
         for vertex in edge:
             glVertex3fv(points[vertex])
     glEnd()
+
+def drawLine(start, end, color):
+    glBegin(GL_LINES)
+    if len(color) == 3:
+        glColor3fv(color)
+    elif len(color) == 4:
+        glColor4fv(color)
+    else:
+        raise ValueError("Color must be a 3-tuple or 4-tuple")
+    glVertex2fv(start)
+    glVertex2fv(end)
+    glEnd()
+

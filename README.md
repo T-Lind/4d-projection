@@ -9,7 +9,10 @@ This could be used for all sorts of mind-bending visualizations, and could be ea
 The 3D analogue of this project is a 2D world with 3D planar slices. This is a bit easier to visualize, so I've included a demo of that as well.
 This technique is then applied to 4D and 3D, respectively. So changing the angle changes the "space" that you're looking at, which is then rendered with OpenGL.
 
-Here's an example 3D visualization:
+Here's a combined example 3D visualization with the 3D objects and 2D projection as an overlay:
+![3D Analogue, Combined](demos/3d-to-2d-real-space-overlay.gif)
+
+Here's a seperated example 3D visualization:
 ![3D Analogue, Real Space](demos/3d-to-2d-real-space-demo.gif)
 
 Here is the same shape (not synced / same movements) projected onto 2D:

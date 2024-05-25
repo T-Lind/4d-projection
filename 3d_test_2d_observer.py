@@ -4,7 +4,7 @@ from OpenGL.GL import *
 from pygame.locals import *
 from scipy.spatial import ConvexHull
 
-from v1.helper import calculate_intersection, convert_to_plane_coordinates
+from v1.helper import calculate_intersection, convert_to_plane_coordinates, drawLine
 
 print("Controls: w/a/s/d: control x/y of plane, scroll wheel: rotate plane, space: toggle auto rotate plane")
 
@@ -76,13 +76,6 @@ for intersection in intersections:
     converted_coords.append(coord)
 converted_edges = []
 
-
-def drawLine(start, end, color):
-    glBegin(GL_LINES)
-    glColor3fv(color)
-    glVertex2fv(start)
-    glVertex2fv(end)
-    glEnd()
 
 
 center = (display[0] // 2, display[1] // 2)
