@@ -1,26 +1,24 @@
 import numpy as np
 import pygame
 from OpenGL.GL import *
-from OpenGL.GLU import *
 from pygame.locals import *
 from scipy.spatial import ConvexHull
 
 from v1.helper import calculate_intersection, convert_to_plane_coordinates
 
-print("Controls: w/a/s/d: control x/y of plane, scroll wheel: rotate plane, space: auto rotate plane")
+print("Controls: w/a/s/d: control x/y of plane, scroll wheel: rotate plane, space: toggle auto rotate plane")
 
 # Initialize Pygame
 pygame.init()
 display = (800, 600)
 pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
-pygame.display.set_caption("2D Observer from 3D slice")
+pygame.display.set_caption("2D Observer from planar slice")
 
 # Set up OpenGL perspective
 glMatrixMode(GL_PROJECTION)
 glLoadIdentity()
 glOrtho(0, display[0], 0, display[1], -1, 1)
 glMatrixMode(GL_MODELVIEW)
-
 
 shape_points = [
     (1, 0, 0),
@@ -86,16 +84,21 @@ def drawLine(start, end, color):
     glVertex2fv(end)
     glEnd()
 
+
 center = (display[0] // 2, display[1] // 2)
 pixels_per_unit = 100
+
+
 def draw():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
 
     # Draw the convex hull (2D)
     for edge in converted_edges:
-        drawLine((converted_coords[edge[0]][0] * pixels_per_unit + center[0], converted_coords[edge[0]][1] * pixels_per_unit + center[1]),
-                 (converted_coords[edge[1]][0] * pixels_per_unit + center[0], converted_coords[edge[1]][1] * pixels_per_unit + center[1]), (0, 1, 0))
+        drawLine((converted_coords[edge[0]][0] * pixels_per_unit + center[0],
+                  converted_coords[edge[0]][1] * pixels_per_unit + center[1]),
+                 (converted_coords[edge[1]][0] * pixels_per_unit + center[0],
+                  converted_coords[edge[1]][1] * pixels_per_unit + center[1]), (0, 1, 0))
 
     pygame.display.flip()
 
@@ -148,6 +151,7 @@ def update():
             converted_edges.append((hull.vertices[i], hull.vertices[i + 1]))
 
         converted_edges.append((hull.vertices[-1], hull.vertices[0]))
+
 
 angle_step = np.pi / 48
 

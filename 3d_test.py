@@ -12,11 +12,13 @@ from pygame.locals import *
 from scipy.spatial import ConvexHull
 from v1.helper import calculate_intersection, convert_to_plane_coordinates, draw_sphere, draw_shape
 
+print("Controls: w/a/s/d and mouse: control camera, i/j/k/l: control x/y of plane, scroll wheel: rotate plane, space: toggle auto rotate plane")
+
 # Initialize Pygame
 pygame.init()
 display = (800, 600)
 pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
-
+pygame.display.set_caption("3D Observer with planar slice")
 # Set up OpenGL perspective
 glMatrixMode(GL_PROJECTION)
 gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
@@ -141,6 +143,7 @@ def update():
 
 # Main loop
 running = True
+auto_rotate = False
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -178,6 +181,8 @@ while running:
             if event.key == pygame.K_l:
                 plane_x += 0.25
                 update()
+            if event.key == pygame.K_SPACE:
+                auto_rotate = not auto_rotate
 
         elif event.type == pygame.MOUSEWHEEL:
             # Update the plane angle based on the mouse wheel scroll
@@ -185,6 +190,10 @@ while running:
             plane_angle %= 2 * np.pi  # Keep the angle within 0 to 2π
             update()
 
+    if auto_rotate:
+        plane_angle += np.pi / 48
+        plane_angle %= 2 * np.pi
+        update()
 
     draw()
 

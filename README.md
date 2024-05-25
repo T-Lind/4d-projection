@@ -4,3 +4,17 @@ Hey there!
 This project allows you to construct 4D objects and then view hyperplanes or "3D slices" of the 4D world.
 
 This could be used for all sorts of mind-bending visualizations, and could be easily replicated into C++ or another more performant language.
+
+## 3D Analogue
+The 3D analogue of this project is a 2D world with 3D planar slices. This is a bit easier to visualize, so I've included a demo of that as well.
+This technique is then applied to 4D and 3D, respectively. So changing the angle changes the "space" that you're looking at, which is then rendered with OpenGL.
+
+Here's an example 3D visualization:
+![3D Analogue, Real Space](demos/3d-to-2d-real-space-demo.gif)
+
+Here is the same shape (not synced / same movements) projected onto 2D:
+![3D Analogue](demos/3d-to-2d-projection-demo.gif)
+
+
+## 4D Visualization
+TODO :)
