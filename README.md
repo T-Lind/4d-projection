@@ -18,3 +18,9 @@ Here is the same shape (not synced / same movements) projected onto 2D:
 
 ## 4D Visualization
 TODO :)
+
+## Running Yourself
+You'll need to have Python installed. This was run on Python 3.11, but newer versions should (?) work as well.
+Python scripts are run as usual.
+
+Cheers!

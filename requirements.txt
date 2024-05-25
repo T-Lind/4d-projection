@@ -3,3 +3,5 @@ numpy~=1.26.4
 pygame~=2.5.2
 sympy~=1.12
 scipy~=1.13.1
+PyOpenGL~=3.1.7
+PyOpenGL_accelerate~=3.1.7
