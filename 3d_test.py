@@ -1,10 +1,13 @@
+# Displays the object/points of intersection and plane in 3D, then plots the 2D coordinates of the intersection points
+# on the plane and the convex hull of the points.
+
 import math
 from random import random as rand
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pygame
 import sympy as sp
+from scipy.spatial import ConvexHull
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from pygame.locals import *
@@ -24,9 +27,10 @@ shape_points = [
     (0, 1, 0),
     (0, 0, 1),
     (0, 0, 0),
-    (2, 1, 1)
-]
+    (2, 1, 1),
 
+]
+# Convex shapes only
 shape_edges = [
     (0, 1),
     (1, 2),
@@ -41,7 +45,7 @@ shape_edges = [
 plane_size = 2
 plane_x = 1
 plane_y = 0.5
-plane_angle = 0.65
+plane_angle = 0.95
 
 plane_points = [
     (plane_x + plane_size * math.cos(plane_angle), plane_y + plane_size * math.sin(plane_angle), -1),
@@ -223,5 +227,18 @@ ax.axvline(0, color='black', lw=0.5)
 
 for coord in converted_coords:
     ax.scatter(*coord)
+
+hull = ConvexHull(converted_coords)
+
+edges = []
+for i in range(len(hull.vertices) - 1):
+    edges.append((hull.vertices[i], hull.vertices[i + 1]))
+
+edges.append((hull.vertices[-1], hull.vertices[0]))
+
+for edge in edges:
+    from_vertex = converted_coords[edge[0]]
+    to_vertex = converted_coords[edge[1]]
+    ax.plot([from_vertex[0], to_vertex[0]], [from_vertex[1], to_vertex[1]], 'r')
 
 plt.show()
