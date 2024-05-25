@@ -7,10 +7,13 @@ from scipy.spatial import ConvexHull
 
 from v1.helper import calculate_intersection, convert_to_plane_coordinates
 
+print("Controls: w/a/s/d: control x/y of plane, scroll wheel: rotate plane, space: auto rotate plane")
+
 # Initialize Pygame
 pygame.init()
 display = (800, 600)
 pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+pygame.display.set_caption("2D Observer from 3D slice")
 
 # Set up OpenGL perspective
 glMatrixMode(GL_PROJECTION)
@@ -83,15 +86,16 @@ def drawLine(start, end, color):
     glVertex2fv(end)
     glEnd()
 
-
+center = (display[0] // 2, display[1] // 2)
+pixels_per_unit = 100
 def draw():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glLoadIdentity()
 
     # Draw the convex hull (2D)
     for edge in converted_edges:
-        drawLine((converted_coords[edge[0]][0] * 100 + 200, converted_coords[edge[0]][1] * 100 + 200),
-                 (converted_coords[edge[1]][0] * 100 + 200, converted_coords[edge[1]][1] * 100 + 200), (0, 1, 0))
+        drawLine((converted_coords[edge[0]][0] * pixels_per_unit + center[0], converted_coords[edge[0]][1] * pixels_per_unit + center[1]),
+                 (converted_coords[edge[1]][0] * pixels_per_unit + center[0], converted_coords[edge[1]][1] * pixels_per_unit + center[1]), (0, 1, 0))
 
     pygame.display.flip()
 
@@ -133,26 +137,31 @@ def update():
         coord = convert_to_plane_coordinates(intersection, (plane_x, plane_y, 0), plane_angle)
         converted_coords.append(coord)
 
-    hull = ConvexHull(converted_coords)
-
     converted_edges = []
-    for i in range(len(hull.vertices) - 1):
-        converted_edges.append((hull.vertices[i], hull.vertices[i + 1]))
+    if len(converted_coords) > 2:
+        try:
+            hull = ConvexHull(converted_coords)
+        except:
+            return
 
-    converted_edges.append((hull.vertices[-1], hull.vertices[0]))
+        for i in range(len(hull.vertices) - 1):
+            converted_edges.append((hull.vertices[i], hull.vertices[i + 1]))
 
+        converted_edges.append((hull.vertices[-1], hull.vertices[0]))
 
+angle_step = np.pi / 48
 
 # Main loop
 update()
 running = True
+auto_bouncing_angle = False
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
             # Move the camera with the WASD keys
-            if event.key in [pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d]:
+            if event.key in [pygame.K_w, pygame.K_s, pygame.K_a, pygame.K_d, pygame.K_SPACE]:
                 if event.key == pygame.K_w:
                     plane_y -= 0.25
                 if event.key == pygame.K_s:
@@ -161,12 +170,19 @@ while running:
                     plane_x -= 0.25
                 if event.key == pygame.K_d:
                     plane_x += 0.25
+                if event.key == pygame.K_SPACE:
+                    auto_bouncing_angle = not auto_bouncing_angle
                 update()
         elif event.type == pygame.MOUSEWHEEL:
             # Update the plane angle based on the mouse wheel scroll
-            plane_angle += event.y * np.pi / 48
+            plane_angle += event.y * angle_step
             plane_angle %= 2 * np.pi  # Keep the angle within 0 to 2π
             update()
+
+    if auto_bouncing_angle:
+        plane_angle += angle_step
+        plane_angle %= 2 * np.pi
+        update()
 
     draw()
 
