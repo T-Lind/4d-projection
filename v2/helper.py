@@ -51,8 +51,8 @@ def convert_to_3d_coordinates(intersection_point, hyperplane_origin, hyperplane_
     cos_theta = np.cos(hyperplane_angle)
     sin_theta = np.sin(hyperplane_angle)
     rotation_matrix = np.array([
-        [cos_theta, sin_theta, 0, 0],
-        [-sin_theta, cos_theta, 0, 0],
+        [cos_theta, -sin_theta, 0, 0],
+        [sin_theta, cos_theta, 0, 0],
         [0, 0, 1, 0],
         [0, 0, 0, 1]
     ])
@@ -67,6 +67,8 @@ def convert_to_3d_coordinates(intersection_point, hyperplane_origin, hyperplane_
 
     return u_prime, v_prime, w_prime
 
+def make_4d_point(p1):
+    return p1[0], p1[1], p1[2], 0
 
 def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
     glBegin(GL_LINES)
