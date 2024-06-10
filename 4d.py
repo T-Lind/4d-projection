@@ -1,6 +1,3 @@
-# Displays the object/points of intersection and plane in 3D, then plots the 2D coordinates of the intersection points
-# on the plane and the convex hull of the points.
-
 import argparse
 import json
 
@@ -45,7 +42,7 @@ last_x, last_y = 0, 0
 mouse_down = False
 
 hplane_angle = config['hyperplane_angle']
-hplane_point = config['hyperplane_position']
+# hplane_point = config['hyperplane_position']
 
 shape_intersections_total = []
 converted_coords_total = []
@@ -73,7 +70,7 @@ def compute_shapes():
         for i in range(len(shape['points']) - 1):
             a = shape['points'][i]
             b = shape['points'][i + 1]
-            intersection = calculate_intersection(a, b, {'point': hplane_point, 'angle': hplane_angle})
+            intersection = calculate_intersection(a, b, {'point': (camera_x, camera_y, camera_z), 'angle': hplane_angle})
             if intersection:
                 intersections.append(intersection)
         shape_intersections_total.append(intersections)
@@ -83,7 +80,7 @@ def compute_shapes():
         converted_coords = []
         for intersection in intersections:
             converted_coords.append(
-                convert_to_3d_coordinates(intersection, (hplane_point[0], hplane_point[1], hplane_point[2], 0),
+                convert_to_3d_coordinates(intersection, (camera_x, camera_y, camera_z, 0),
                                           hplane_angle))
         converted_coords_total.append(converted_coords)
 
