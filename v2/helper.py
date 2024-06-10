@@ -1,5 +1,6 @@
 import numpy as np
-
+from OpenGL.GL import *
+from OpenGL.GLU import *
 
 def load_json_4d(file_path):
     import json
@@ -55,3 +56,29 @@ def transform_shapes_4d_to_3d(shapes, plane_normal, plane_point):
         transformed_shapes.append(transformed_shape)
     # print("Transformed 4D shapes to 3D", transformed_shapes)
     return transformed_shapes
+
+
+def draw_sphere(center, radius=0.025):
+    slices = 30
+    stacks = 30
+
+    glPushMatrix()
+    glTranslatef(center[0], center[1], center[2])
+    quadric = gluNewQuadric()
+    gluQuadricNormals(quadric, GLU_SMOOTH)
+    gluQuadricTexture(quadric, GL_TRUE)
+    gluSphere(quadric, radius, slices, stacks)
+    gluDeleteQuadric(quadric)
+    glPopMatrix()
+
+
+def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
+    glBegin(GL_LINES)
+    glColor3f(*color[:3])
+    for edge in edges:
+        for vertex in edge:
+            pt = points[vertex]
+            if len(pt) != 3:
+                raise ValueError("Each vertex must have 3 coordinates, fail: ", pt)
+            glVertex3fv(pt)
+    glEnd()

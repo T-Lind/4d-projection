@@ -5,6 +5,8 @@ This project allows you to construct 4D objects and then view hyperplanes or "3D
 
 This could be used for all sorts of mind-bending visualizations, and could be easily replicated into C++ or another more performant language.
 
+![4D to 3D Mapping](demos/4d-to-3d.gif)
+
 ## 3D Analogue
 The 3D analogue of this project is a 2D world with 3D planar slices. This is a bit easier to visualize, so I've included a demo of that as well.
 This technique is then applied to 4D and 3D, respectively. So changing the angle changes the "space" that you're looking at, which is then rendered with OpenGL.
@@ -20,7 +22,7 @@ Here is the same shape (not synced / same movements) projected onto 2D:
 
 
 ## 4D Visualization
-TODO :)
+![4D to 3D Mapping](demos/4d-to-3d-projection-demo.png)
 
 ## Running Yourself
 You'll need to have Python installed. This was run on Python 3.11, but newer versions should (?) work as well.

@@ -68,7 +68,10 @@ def draw_shape(points, edges, color=(1.0, 1.0, 1.0)):
     glColor3f(*color[:3])
     for edge in edges:
         for vertex in edge:
-            glVertex3fv(points[vertex])
+            pt = points[vertex]
+            if len(pt) != 3:
+                raise ValueError("Each vertex must have 3 coordinates, fail: ", pt)
+            glVertex3fv(pt)
     glEnd()
 
 def drawLine(start, end, color):
