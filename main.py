@@ -3,7 +3,7 @@ import pygame
 import numpy as np
 from math import cos, sin
 import sys
-from shapes import Shape4D, load_4ds
+from shapes import Shape4D, load_4ds, ShapeLoader
 
 class Tesseract(Shape4D):
     def __init__(self):
@@ -35,12 +35,13 @@ class Tesseract(Shape4D):
         
         # Define colors for faces
         face_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
-                      (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 4
+                    (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 4
 
         super().__init__(vertices, edges, faces, face_colors)
 
+
 class FourDRenderer:
-    def __init__(self, width=800, height=600):
+    def __init__(self, shapes=None, width=800, height=600):
         pygame.init()
         self.width = width
         self.height = height
@@ -48,7 +49,10 @@ class FourDRenderer:
         pygame.display.set_caption("4D Shape Visualization")
         
         self.clock = pygame.time.Clock()
-        self.shape = Tesseract()  # Default shape
+        if not shapes:
+            self.shape = Tesseract()  # Default shape
+        else:
+            self.shape = shapes[0]  # Only can load one shape for the moment.
         
         # Camera/view parameters
         self.scale = 100
@@ -207,7 +211,6 @@ class FourDRenderer:
         sys.exit()
 
 if __name__ == "__main__":
-    renderer = FourDRenderer()
-    # Optionally load a custom shape:
-    # renderer.load_shape("custom_shape.4ds")
+    s = ShapeLoader.load_shape("shapes/pentachoron.4ds")
+    renderer = FourDRenderer(shapes=[s])
     renderer.run()
