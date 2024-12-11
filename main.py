@@ -141,34 +141,56 @@ class FourDRenderer:
         # Project to 2D
         points_2d = self.project_3d_to_2d(points_3d)
         
-        # Draw edges
-        for edge in self.shape.edges:
-            start = points_2d[edge[0]]
-            end = points_2d[edge[1]]
-            start_pos = (int(start[0] + self.position[0]), 
-                        int(start[1] + self.position[1]))
-            end_pos = (int(end[0] + self.position[0]), 
-                      int(end[1] + self.position[1]))
-            pygame.draw.line(self.screen, (255, 255, 255), start_pos, end_pos, 1)
+        # Update the face rendering section in main.py
+        face_depths = [(face, np.mean(points_3d[list(face)][:, 2])) 
+                    for face, _ in zip(self.shape.faces, self.shape.face_colors)]
+        # Sort faces back-to-front for proper overlay
+        face_depths.sort(key=lambda x: -x[1])  # Note the negative sign for reverse sort
 
-        # Draw faces
-        for face, _ in face_depths:
+        # Draw faces with improved lighting and anti-aliasing
+        for face, depth in face_depths:
+            # Calculate face normal
             normal = self.calculate_face_normal(points_3d, face)
-            if normal[2] < 0:  # Back-face culling
+            
+            # Enhanced back-face culling with threshold
+            if normal[2] < -0.1:  # Small threshold to prevent edge cases
                 continue
-                
+            
+            # Get face vertices in 2D
             face_points = [(int(points_2d[i][0] + self.position[0]),
-                           int(points_2d[i][1] + self.position[1]))
-                          for i in face]
+                        int(points_2d[i][1] + self.position[1]))
+                        for i in face]
+            
+            # Get base color
             color = self.shape.face_colors[self.shape.faces.index(face)]
-            # Apply basic lighting
-            intensity = max(0.9, min(1.0, -normal[2]))
-            lit_color = tuple(int(c * intensity) for c in color)
+            
+            # Improved lighting calculation
+            # Ambient light component
+            ambient = 0.2
+            # Diffuse light component (dot product with light direction)
+            light_dir = np.array([0.5, -0.5, -1.0])
+            light_dir = light_dir / np.linalg.norm(light_dir)
+            diffuse = max(0.0, -np.dot(normal, light_dir))
+            # Combine lighting
+            intensity = min(1.0, ambient + diffuse * 0.8)
+            
+            # Calculate lit color with gamma correction
+            gamma = 2.2
+            linear_color = tuple(pow(c/255, gamma) for c in color[:3])
+            lit_color = tuple(int(min(255, max(0, pow(c * intensity, 1/gamma) * 255))) 
+                            for c in linear_color)
+            
+            # Draw anti-aliased polygon
+            # First fill
             pygame.draw.polygon(self.screen, lit_color, face_points)
-        
+            # Then draw anti-aliased edges
+            for i in range(len(face_points)):
+                start = face_points[i]
+                end = face_points[(i + 1) % len(face_points)]
+                pygame.draw.aaline(self.screen, lit_color, start, end)
 
-        
         pygame.display.flip()
+
 
     def run(self):
         running = True
