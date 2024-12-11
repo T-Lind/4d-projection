@@ -21,6 +21,15 @@ class Shape4D:
         with open(filename, 'w') as f:
             json.dump(data, f, indent=2)
 
+    def get_projected_face_depths(self, projected_vertices: np.ndarray) -> List[float]:
+        """Calculate average Z depth of each face after projection"""
+        depths = []
+        for face in self.faces:
+            face_verts = projected_vertices[list(face)]
+            avg_depth = np.mean(face_verts[:, 2])  # Z coordinate
+            depths.append(avg_depth)
+        return depths
+
 class ShapeLoader:
     @staticmethod
     def load_shape(filename: str) -> Shape4D:

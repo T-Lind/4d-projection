@@ -56,7 +56,6 @@ class FourDRenderer:
         
         # Camera/view parameters
         self.scale = 100
-        self.w_slice = 0
         self.angles_3d = [0, 0, 0]  # XY, YZ, XZ rotations
         self.angles_4d = [0, 0, 0, 0]  # XW, YW, ZW rotations
         self.position = [width//2, height//2, 0]
@@ -93,7 +92,7 @@ class FourDRenderer:
             result = np.dot(result, rotation)
         return result
 
-    def project_4d_to_3d(self, points_4d, w_slice):
+    def project_4d_to_3d(self, points_4d):
         scale = 1 / (4 - points_4d[:, 3])
         points_3d = points_4d[:, :3] * scale[:, np.newaxis]
         return points_3d
@@ -129,7 +128,7 @@ class FourDRenderer:
         rotated_4d = self.rotate_4d(self.shape.vertices, self.angles_4d)
         
         # Project to 3D
-        points_3d = self.project_4d_to_3d(rotated_4d, self.w_slice)
+        points_3d = self.project_4d_to_3d(rotated_4d)
         
         # Apply 3D rotations
         points_3d = self.rotate_3d(points_3d, self.angles_3d)
@@ -194,10 +193,6 @@ class FourDRenderer:
             if keys[pygame.K_v]: self.angles_3d[2] += 0.02
             if keys[pygame.K_b]: self.angles_3d[2] -= 0.02
             
-            # W-slice control
-            if keys[pygame.K_UP]: self.w_slice += 0.1
-            if keys[pygame.K_DOWN]: self.w_slice -= 0.1
-            
             # Translation
             if keys[pygame.K_LEFT]: self.position[0] -= 5
             if keys[pygame.K_RIGHT]: self.position[0] += 5
@@ -211,6 +206,5 @@ class FourDRenderer:
         sys.exit()
 
 if __name__ == "__main__":
-    s = ShapeLoader.load_shape("shapes/tesseract.4ds")
-    renderer = FourDRenderer(shapes=[s])
+    renderer = FourDRenderer()
     renderer.run()
