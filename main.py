@@ -141,6 +141,16 @@ class FourDRenderer:
         # Project to 2D
         points_2d = self.project_3d_to_2d(points_3d)
         
+        # Draw edges
+        for edge in self.shape.edges:
+            start = points_2d[edge[0]]
+            end = points_2d[edge[1]]
+            start_pos = (int(start[0] + self.position[0]), 
+                        int(start[1] + self.position[1]))
+            end_pos = (int(end[0] + self.position[0]), 
+                      int(end[1] + self.position[1]))
+            pygame.draw.line(self.screen, (255, 255, 255), start_pos, end_pos, 1)
+
         # Draw faces
         for face, _ in face_depths:
             normal = self.calculate_face_normal(points_3d, face)
@@ -152,19 +162,11 @@ class FourDRenderer:
                           for i in face]
             color = self.shape.face_colors[self.shape.faces.index(face)]
             # Apply basic lighting
-            intensity = max(0.2, min(1.0, -normal[2]))
+            intensity = max(0.9, min(1.0, -normal[2]))
             lit_color = tuple(int(c * intensity) for c in color)
             pygame.draw.polygon(self.screen, lit_color, face_points)
         
-        # Draw edges
-        for edge in self.shape.edges:
-            start = points_2d[edge[0]]
-            end = points_2d[edge[1]]
-            start_pos = (int(start[0] + self.position[0]), 
-                        int(start[1] + self.position[1]))
-            end_pos = (int(end[0] + self.position[0]), 
-                      int(end[1] + self.position[1]))
-            pygame.draw.line(self.screen, (255, 255, 255), start_pos, end_pos, 1)
+
         
         pygame.display.flip()
 
