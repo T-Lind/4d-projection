@@ -1,21 +1,43 @@
+# main.py
 import pygame
 import numpy as np
 from math import cos, sin
 import sys
+from shapes import Shape4D, load_4ds
 
-class Tesseract:
+class Tesseract(Shape4D):
     def __init__(self):
         # Define vertices of a tesseract (16 points in 4D space)
-        self.vertices_4d = np.array([
+        vertices = np.array([
             [x, y, z, w] for x in [-1, 1] 
                         for y in [-1, 1]
                         for z in [-1, 1]
                         for w in [-1, 1]
         ], dtype=float)
         
-        # Define edges - pairs of vertex indices that form lines
-        self.edges = [(i, j) for i in range(16) for j in range(i + 1, 16)
-                     if sum(abs(self.vertices_4d[i] - self.vertices_4d[j]) < 0.1) == 3]
+        # Define edges
+        edges = [(i, j) for i in range(16) for j in range(i + 1, 16)
+                if sum(abs(vertices[i] - vertices[j]) < 0.1) == 3]
+        
+        # Define faces (3D cubes in 4D)
+        faces = [
+            # Front cube (w = -1)
+            (0, 1, 3, 2), (0, 2, 6, 4), (0, 1, 5, 4),
+            (1, 3, 7, 5), (2, 3, 7, 6), (4, 5, 7, 6),
+            # Back cube (w = 1)
+            (8, 9, 11, 10), (8, 10, 14, 12), (8, 9, 13, 12),
+            (9, 11, 15, 13), (10, 11, 15, 14), (12, 13, 15, 14),
+            # Connecting faces
+            (0, 1, 9, 8), (2, 3, 11, 10), (4, 5, 13, 12),
+            (6, 7, 15, 14), (0, 2, 10, 8), (1, 3, 11, 9),
+            (4, 6, 14, 12), (5, 7, 15, 13)
+        ]
+        
+        # Define colors for faces
+        face_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
+                      (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 4
+
+        super().__init__(vertices, edges, faces, face_colors)
 
 class FourDRenderer:
     def __init__(self, width=800, height=600):
@@ -23,10 +45,10 @@ class FourDRenderer:
         self.width = width
         self.height = height
         self.screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("4D Tesseract Visualization")
+        pygame.display.set_caption("4D Shape Visualization")
         
         self.clock = pygame.time.Clock()
-        self.tesseract = Tesseract()
+        self.shape = Tesseract()  # Default shape
         
         # Camera/view parameters
         self.scale = 100
@@ -35,8 +57,10 @@ class FourDRenderer:
         self.angles_4d = [0, 0, 0, 0]  # XW, YW, ZW rotations
         self.position = [width//2, height//2, 0]
         
+    def load_shape(self, filename: str):
+        self.shape = load_4ds(filename)
+        
     def rotate_4d(self, points, angles_4d):
-        # Create rotation matrices for 4D rotations
         rotations = []
         
         # XW rotation
@@ -66,13 +90,11 @@ class FourDRenderer:
         return result
 
     def project_4d_to_3d(self, points_4d, w_slice):
-        # Project 4D points to 3D by intersecting with w=w_slice hyperplane
         scale = 1 / (4 - points_4d[:, 3])
         points_3d = points_4d[:, :3] * scale[:, np.newaxis]
         return points_3d
 
     def rotate_3d(self, points, angles):
-        # Apply 3D rotations
         for axis in range(3):
             c, s = cos(angles[axis]), sin(angles[axis])
             if axis == 0:  # XY
@@ -85,16 +107,22 @@ class FourDRenderer:
         return points
 
     def project_3d_to_2d(self, points_3d):
-        # Simple perspective projection
         scale = 1000 / (5 - points_3d[:, 2])
         points_2d = points_3d[:, :2] * scale[:, np.newaxis]
         return points_2d
+
+    def calculate_face_normal(self, points_3d, face):
+        # Calculate normal vector for face culling
+        v1 = points_3d[face[1]] - points_3d[face[0]]
+        v2 = points_3d[face[2]] - points_3d[face[0]]
+        normal = np.cross(v1, v2)
+        return normal / np.linalg.norm(normal)
 
     def draw(self):
         self.screen.fill((0, 0, 0))
         
         # Apply 4D rotations
-        rotated_4d = self.rotate_4d(self.tesseract.vertices_4d, self.angles_4d)
+        rotated_4d = self.rotate_4d(self.shape.vertices, self.angles_4d)
         
         # Project to 3D
         points_3d = self.project_4d_to_3d(rotated_4d, self.w_slice)
@@ -102,18 +130,38 @@ class FourDRenderer:
         # Apply 3D rotations
         points_3d = self.rotate_3d(points_3d, self.angles_3d)
         
+        # Sort faces by depth for painter's algorithm
+        face_depths = [(face, np.mean(points_3d[list(face)][:, 2])) 
+                      for face, _ in zip(self.shape.faces, self.shape.face_colors)]
+        face_depths.sort(key=lambda x: x[1])
+        
         # Project to 2D
         points_2d = self.project_3d_to_2d(points_3d)
         
+        # Draw faces
+        for face, _ in face_depths:
+            normal = self.calculate_face_normal(points_3d, face)
+            if normal[2] < 0:  # Back-face culling
+                continue
+                
+            face_points = [(int(points_2d[i][0] + self.position[0]),
+                           int(points_2d[i][1] + self.position[1]))
+                          for i in face]
+            color = self.shape.face_colors[self.shape.faces.index(face)]
+            # Apply basic lighting
+            intensity = max(0.2, min(1.0, -normal[2]))
+            lit_color = tuple(int(c * intensity) for c in color)
+            pygame.draw.polygon(self.screen, lit_color, face_points)
+        
         # Draw edges
-        for edge in self.tesseract.edges:
+        for edge in self.shape.edges:
             start = points_2d[edge[0]]
             end = points_2d[edge[1]]
             start_pos = (int(start[0] + self.position[0]), 
                         int(start[1] + self.position[1]))
             end_pos = (int(end[0] + self.position[0]), 
                       int(end[1] + self.position[1]))
-            pygame.draw.line(self.screen, (0, 255, 0), start_pos, end_pos, 1)
+            pygame.draw.line(self.screen, (255, 255, 255), start_pos, end_pos, 1)
         
         pygame.display.flip()
 
@@ -160,4 +208,6 @@ class FourDRenderer:
 
 if __name__ == "__main__":
     renderer = FourDRenderer()
+    # Optionally load a custom shape:
+    # renderer.load_shape("custom_shape.4ds")
     renderer.run()
