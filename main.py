@@ -39,6 +39,19 @@ class Tesseract(Shape4D):
 
         super().__init__(vertices, edges, faces, face_colors)
 
+class LightSource:
+    def __init__(self, position, color, intensity, falloff=1.0):
+        self.position = np.array(position, dtype=float)
+        self.color = np.array(color, dtype=float) / 255.0
+        self.intensity = float(intensity)
+        self.falloff = float(falloff)
+
+class Material:
+    def __init__(self, ambient=0.2, diffuse=0.7, specular=0.5, shininess=32):
+        self.ambient = float(ambient)
+        self.diffuse = float(diffuse)
+        self.specular = float(specular)
+        self.shininess = float(shininess)
 
 class FourDRenderer:
     def __init__(self, shapes=None, width=800, height=600):
@@ -59,6 +72,72 @@ class FourDRenderer:
         self.angles_3d = [0, 0, 0]  # XY, YZ, XZ rotations
         self.angles_4d = [0, 0, 0, 0]  # XW, YW, ZW rotations
         self.position = [width//2, height//2, 0]
+
+        self.lights = [
+            LightSource(
+                position=[500, -300, 1000],
+                color=[255, 255, 255],
+                intensity=5.0
+            )
+        ]
+        self.default_material = Material()
+
+    def calculate_lighting(self, point, normal, material, view_pos, debug=False):
+        """Calculate lighting for a point using Phong illumination"""
+        final_color = np.zeros(3)
+        
+        # Debug prints
+        if debug:
+            print(f"Point: {point}")
+            print(f"Normal: {normal}")
+        
+        # Normalize vectors safely
+        normal_magnitude = np.linalg.norm(normal)
+        if normal_magnitude == 0:
+            return np.ones(3)  # Return white if normal is zero
+        normal = normal / normal_magnitude
+        
+        view_dir = view_pos - point
+        view_magnitude = np.linalg.norm(view_dir)
+        if view_magnitude == 0:
+            view_dir = np.array([0, 0, 1])
+        else:
+            view_dir = view_dir / view_magnitude
+
+        for light in self.lights:
+            # Vector to light
+            light_dir = light.position - point
+            distance = np.linalg.norm(light_dir)
+            if distance == 0:
+                continue
+            light_dir = light_dir / distance
+            
+            # Reduce falloff effect
+            attenuation = 1.0 / (1.0 + light.falloff * distance * 0.001)
+            
+            # Increase ambient light
+            ambient = material.ambient * light.color * light.intensity * 0.5
+            
+            # Calculate diffuse with safety check
+            diff = max(np.dot(normal, light_dir), 0.0)
+            diffuse = material.diffuse * diff * light.color * light.intensity
+            
+            # Calculate specular with safety check
+            reflect_dir = 2.0 * np.dot(normal, light_dir) * normal - light_dir
+            spec = max(np.dot(view_dir, reflect_dir), 0.0)
+            if spec > 0:
+                spec = pow(spec, material.shininess)
+            specular = material.specular * spec * light.color * light.intensity
+            
+            if debug:
+                # Print debug info
+                print(f"Light contribution: ambient={ambient}, diffuse={diffuse}, specular={specular}")
+            
+            final_color += (ambient + diffuse + specular) * attenuation
+
+        # Ensure minimum brightness
+        final_color = np.maximum(final_color, 0.2)
+        return np.clip(final_color, 0, 1)
         
     def load_shape(self, filename: str):
         self.shape = load_4ds(filename)
@@ -147,50 +226,85 @@ class FourDRenderer:
         # Sort faces back-to-front for proper overlay
         face_depths.sort(key=lambda x: -x[1])  # Note the negative sign for reverse sort
 
-        # Draw faces with improved lighting and anti-aliasing
         for face, depth in face_depths:
-            # Calculate face normal
             normal = self.calculate_face_normal(points_3d, face)
-            
-            # Enhanced back-face culling with threshold
-            if normal[2] < -0.1:  # Small threshold to prevent edge cases
+            if normal[2] < -0.1:
                 continue
+                
+            # Calculate center point of face for lighting
+            face_center = np.mean(points_3d[list(face)], axis=0)
+            view_pos = np.array([0, 0, 1000])  # Camera position
             
-            # Get face vertices in 2D
+            # Get base color and convert to float RGB
+            base_color = np.array(self.shape.face_colors[self.shape.faces.index(face)][:3]) / 255.0
+            
+            # Calculate lighting
+            light_intensity = self.calculate_lighting(
+                face_center, 
+                normal, 
+                self.default_material,
+                view_pos
+            )
+            
+            # Apply lighting to base color
+            final_color = np.clip(base_color * light_intensity, 0, 1)
+            
+            # Convert back to 8-bit RGB
+            render_color = tuple(int(c * 255) for c in final_color)
+            
+            # Draw face
             face_points = [(int(points_2d[i][0] + self.position[0]),
                         int(points_2d[i][1] + self.position[1]))
                         for i in face]
-            
-            # Get base color
-            color = self.shape.face_colors[self.shape.faces.index(face)]
-            
-            # Improved lighting calculation
-            # Ambient light component
-            ambient = 0.2
-            # Diffuse light component (dot product with light direction)
-            light_dir = np.array([0.5, -0.5, -1.0])
-            light_dir = light_dir / np.linalg.norm(light_dir)
-            diffuse = max(0.0, -np.dot(normal, light_dir))
-            # Combine lighting
-            intensity = min(1.0, ambient + diffuse * 0.8)
-            
-            # Calculate lit color with gamma correction
-            gamma = 2.2
-            linear_color = tuple(pow(c/255, gamma) for c in color[:3])
-            lit_color = tuple(int(min(255, max(0, pow(c * intensity, 1/gamma) * 255))) 
-                            for c in linear_color)
-            
-            # Draw anti-aliased polygon
-            # First fill
-            pygame.draw.polygon(self.screen, lit_color, face_points)
-            # Then draw anti-aliased edges
+            pygame.draw.polygon(self.screen, render_color, face_points)
+            # Anti-aliased edges
             for i in range(len(face_points)):
                 start = face_points[i]
                 end = face_points[(i + 1) % len(face_points)]
-                pygame.draw.aaline(self.screen, lit_color, start, end)
+                pygame.draw.aaline(self.screen, render_color, start, end)
+
+
+        edges_with_depth = []
+        for edge in self.shape.edges:
+            start_idx, end_idx = edge
+            start_3d = points_3d[start_idx]
+            end_3d = points_3d[end_idx]
+            edge_depth = (start_3d[2] + end_3d[2]) / 2
+            start_2d = points_2d[start_idx]
+            end_2d = points_2d[end_idx]
+            edges_with_depth.append((edge_depth, start_2d, end_2d))
+
+        # Sort faces and edges by depth
+        face_depths = self.shape.get_projected_face_depths(points_3d)
+        sorted_faces = sorted(zip(face_depths, self.shape.faces), key=lambda x: x[0])
+        edges_with_depth.sort(key=lambda x: x[0])
+
+        # Then draw visible edges
+        for edge_depth, start_2d, end_2d in edges_with_depth:
+            # Check if edge is behind any face
+            is_visible = True
+            edge_start = np.array([start_2d[0], start_2d[1]])
+            edge_end = np.array([end_2d[0], end_2d[1]])
+            
+            for face_depth, face in sorted_faces:
+                if face_depth < edge_depth:  # Face is in front of edge
+                    # Project face points to 2D
+                    face_points_2d = [np.array([points_2d[i][0], points_2d[i][1]]) 
+                                    for i in face]
+                    
+                    if self.shape.edge_intersects_face(edge_start, edge_end, face_points_2d):
+                        is_visible = False
+                        break
+            
+            if is_visible:
+                start_pos = (int(start_2d[0] + self.position[0]), 
+                            int(start_2d[1] + self.position[1]))
+                end_pos = (int(end_2d[0] + self.position[0]), 
+                        int(end_2d[1] + self.position[1]))
+                pygame.draw.aaline(self.screen, (255, 255, 255), start_pos, end_pos)
+
 
         pygame.display.flip()
-
 
     def run(self):
         running = True
