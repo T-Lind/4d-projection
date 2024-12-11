@@ -211,6 +211,6 @@ class FourDRenderer:
         sys.exit()
 
 if __name__ == "__main__":
-    s = ShapeLoader.load_shape("shapes/pentachoron.4ds")
+    s = ShapeLoader.load_shape("shapes/tesseract.4ds")
     renderer = FourDRenderer(shapes=[s])
     renderer.run()
