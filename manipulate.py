@@ -1,4 +1,3 @@
-# main.py
 import pygame
 import numpy as np
 from math import cos, sin
@@ -7,7 +6,6 @@ from shapes import Shape4D, load_4ds, ShapeLoader
 
 class Tesseract(Shape4D):
     def __init__(self):
-        # Define vertices of a tesseract (16 points in 4D space)
         vertices = np.array([
             [x, y, z, w] for x in [-1, 1] 
                         for y in [-1, 1]
@@ -15,11 +13,9 @@ class Tesseract(Shape4D):
                         for w in [-1, 1]
         ], dtype=float)
         
-        # Define edges
         edges = [(i, j) for i in range(16) for j in range(i + 1, 16)
                 if sum(abs(vertices[i] - vertices[j]) < 0.1) == 3]
         
-        # Define faces (3D cubes in 4D)
         faces = [
             # Front cube (w = -1)
             (0, 1, 3, 2), (0, 2, 6, 4), (0, 1, 5, 4),
@@ -33,7 +29,7 @@ class Tesseract(Shape4D):
             (4, 6, 14, 12), (5, 7, 15, 13)
         ]
         
-        # Define colors for faces
+        # Colors for faces
         face_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255),
                     (255, 255, 0), (255, 0, 255), (0, 255, 255)] * 4
 
@@ -67,7 +63,6 @@ class FourDRenderer:
         else:
             self.shape = shapes[0]  # Only can load one shape for the moment.
         
-        # Camera/view parameters
         self.scale = 100
         self.angles_3d = [0, 0, 0]  # XY, YZ, XZ rotations
         self.angles_4d = [0, 0, 0, 0]  # XW, YW, ZW rotations
@@ -91,10 +86,9 @@ class FourDRenderer:
             print(f"Point: {point}")
             print(f"Normal: {normal}")
         
-        # Normalize vectors safely
         normal_magnitude = np.linalg.norm(normal)
         if normal_magnitude == 0:
-            return np.ones(3)  # Return white if normal is zero
+            return np.ones(3)
         normal = normal / normal_magnitude
         
         view_dir = view_pos - point
@@ -105,24 +99,24 @@ class FourDRenderer:
             view_dir = view_dir / view_magnitude
 
         for light in self.lights:
-            # Vector to light
+            # Vec to light
             light_dir = light.position - point
             distance = np.linalg.norm(light_dir)
             if distance == 0:
                 continue
             light_dir = light_dir / distance
             
-            # Reduce falloff effect
+            # Decr falloff effect
             attenuation = 1.0 / (1.0 + light.falloff * distance * 0.001)
             
-            # Increase ambient light
+            # Incr ambient light
             ambient = material.ambient * light.color * light.intensity * 0.5
             
-            # Calculate diffuse with safety check
+            # Calculate diffuse
             diff = max(np.dot(normal, light_dir), 0.0)
             diffuse = material.diffuse * diff * light.color * light.intensity
             
-            # Calculate specular with safety check
+            # Calculate specular
             reflect_dir = 2.0 * np.dot(normal, light_dir) * normal - light_dir
             spec = max(np.dot(view_dir, reflect_dir), 0.0)
             if spec > 0:
@@ -135,7 +129,7 @@ class FourDRenderer:
             
             final_color += (ambient + diffuse + specular) * attenuation
 
-        # Ensure minimum brightness
+        # Min brightness defined here
         final_color = np.maximum(final_color, 0.2)
         return np.clip(final_color, 0, 1)
         
@@ -145,21 +139,21 @@ class FourDRenderer:
     def rotate_4d(self, points, angles_4d):
         rotations = []
         
-        # XW rotation
+        # XW rot
         rot_xw = np.eye(4)
         c, s = cos(angles_4d[0]), sin(angles_4d[0])
         rot_xw[[0, 3], [0, 3]] = c
         rot_xw[[0, 3], [3, 0]] = [-s, s]
         rotations.append(rot_xw)
         
-        # YW rotation
+        # YW rot
         rot_yw = np.eye(4)
         c, s = cos(angles_4d[1]), sin(angles_4d[1])
         rot_yw[[1, 3], [1, 3]] = c
         rot_yw[[1, 3], [3, 1]] = [-s, s]
         rotations.append(rot_yw)
         
-        # ZW rotation
+        # ZW rot
         rot_zw = np.eye(4)
         c, s = cos(angles_4d[2]), sin(angles_4d[2])
         rot_zw[[2, 3], [2, 3]] = c
@@ -219,26 +213,25 @@ class FourDRenderer:
         
         # Project to 2D
         points_2d = self.project_3d_to_2d(points_3d)
-        
-        # Update the face rendering section in main.py
+
         face_depths = [(face, np.mean(points_3d[list(face)][:, 2])) 
                     for face, _ in zip(self.shape.faces, self.shape.face_colors)]
-        # Sort faces back-to-front for proper overlay
-        face_depths.sort(key=lambda x: -x[1])  # Note the negative sign for reverse sort
+        # Sort faces back-to-front for corret overlay
+        face_depths.sort(key=lambda x: -x[1])  # Neg sign for reverse sort
 
         for face, depth in face_depths:
             normal = self.calculate_face_normal(points_3d, face)
             if normal[2] < -0.1:
                 continue
                 
-            # Calculate center point of face for lighting
+            # Center point of face for lighting
             face_center = np.mean(points_3d[list(face)], axis=0)
             view_pos = np.array([0, 0, 1000])  # Camera position
             
             # Get base color and convert to float RGB
             base_color = np.array(self.shape.face_colors[self.shape.faces.index(face)][:3]) / 255.0
             
-            # Calculate lighting
+            # Calc lighting
             light_intensity = self.calculate_lighting(
                 face_center, 
                 normal, 
@@ -252,12 +245,12 @@ class FourDRenderer:
             # Convert back to 8-bit RGB
             render_color = tuple(int(c * 255) for c in final_color)
             
-            # Draw face
+            # Draw the face
             face_points = [(int(points_2d[i][0] + self.position[0]),
                         int(points_2d[i][1] + self.position[1]))
                         for i in face]
             pygame.draw.polygon(self.screen, render_color, face_points)
-            # Anti-aliased edges
+            # anti-aliased edges
             for i in range(len(face_points)):
                 start = face_points[i]
                 end = face_points[(i + 1) % len(face_points)]
@@ -279,9 +272,9 @@ class FourDRenderer:
         sorted_faces = sorted(zip(face_depths, self.shape.faces), key=lambda x: x[0])
         edges_with_depth.sort(key=lambda x: x[0])
 
-        # Then draw visible edges
+        # Draw visible edges
         for edge_depth, start_2d, end_2d in edges_with_depth:
-            # Check if edge is behind any face
+            # See if edge is behind any face
             is_visible = True
             edge_start = np.array([start_2d[0], start_2d[1]])
             edge_end = np.array([end_2d[0], end_2d[1]])
@@ -315,7 +308,7 @@ class FourDRenderer:
                     
             keys = pygame.key.get_pressed()
             
-            # 4D rotations
+            # 4D rots
             if keys[pygame.K_q]: self.angles_4d[0] += 0.02
             if keys[pygame.K_w]: self.angles_4d[0] -= 0.02
             if keys[pygame.K_a]: self.angles_4d[1] += 0.02
@@ -323,7 +316,7 @@ class FourDRenderer:
             if keys[pygame.K_z]: self.angles_4d[2] += 0.02
             if keys[pygame.K_x]: self.angles_4d[2] -= 0.02
             
-            # 3D rotations
+            # 3D rots
             if keys[pygame.K_r]: self.angles_3d[0] += 0.02
             if keys[pygame.K_t]: self.angles_3d[0] -= 0.02
             if keys[pygame.K_f]: self.angles_3d[1] += 0.02

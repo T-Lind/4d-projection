@@ -1,6 +1,6 @@
 # 4D Shape Visualizer
 
-![Tesseract Rotation](tesseract-faces.gif)
+![Tesseract Rotation](tesseract-with-lighting.gif)
 
 A Python application for visualizing and interacting with 4-dimensional geometric shapes in real-time.
 
