@@ -49,12 +49,11 @@ class Shape4D:
             o3 = orientation(p2, q2, p1)
             o4 = orientation(p2, q2, q1)
 
-            if (o1 != o2 and o3 != o4):
-                return True
-            if (o1 == 0 and on_segment(p1, p2, q1)): return True
-            if (o2 == 0 and on_segment(p1, q2, q1)): return True
-            if (o3 == 0 and on_segment(p2, p1, q2)): return True
-            if (o4 == 0 and on_segment(p2, q1, q2)): return True
+            if o1 != o2 and o3 != o4: return True
+            if o1 == 0 and on_segment(p1, p2, q1): return True
+            if o2 == 0 and on_segment(p1, q2, q1): return True
+            if o3 == 0 and on_segment(p2, p1, q2): return True
+            if o4 == 0 and on_segment(p2, q1, q2): return True
             return False
 
         # Check if edge intersects any face edge
