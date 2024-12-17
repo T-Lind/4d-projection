@@ -267,6 +267,41 @@ def create_unit_cube_mesh():
     
     return faces
 
+def load_obj(filename, scale=1.0, translate=(0, 0, 0)):
+    """
+    Load a .obj file and return a list of faces (triangles).
+    :param filename: Path to the .obj file.
+    :param scale: Uniform scaling factor.
+    :param translate: (x, y, z) translation to apply to all vertices.
+    :return: List of triangles [(v1, v2, v3), ...] where each vertex vi is (x, y, z).
+    """
+    vertices = []
+    faces = []
+    
+    with open(filename, 'r') as file:
+        for line in file:
+            parts = line.strip().split()
+            if not parts or parts[0].startswith('#'):
+                continue  # Skip empty lines or comments
+            if parts[0] == 'v':  # Vertex
+                x, y, z = map(float, parts[1:4])
+                x, y, z = x * scale + translate[0], y * scale + translate[1], z * scale + translate[2]
+                vertices.append((x, y, z))
+            elif parts[0] == 'f':  # Face (1-based index)
+                indices = [int(idx.split('/')[0]) - 1 for idx in parts[1:]]
+                if len(indices) == 3:  # Triangular face
+                    faces.append((vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]))
+                elif len(indices) > 3:  # Convert polygon to triangles
+                    for i in range(1, len(indices) - 1):
+                        faces.append((
+                            vertices[indices[0]],
+                            vertices[indices[i]],
+                            vertices[indices[i + 1]]
+                        ))
+    
+    return faces
+
+
 # ---------------------------
 # MAIN LOOP
 # ---------------------------
@@ -351,5 +386,96 @@ def main():
     pygame.quit()
     sys.exit()
 
+
+
+# if __name__ == "__main__":
+    # main()
+
+def main_with_multiple_objects():
+    pygame.display.set_caption("3D Object Slicing with Multiple Objects")
+    
+    # Camera state
+    camera_x = 0.0
+    camera_y = 0.0
+    camera_z = 0.0
+    
+    # Plane rotation angle around +Z, in degrees
+    plane_angle = 0.0
+    
+    # Load objects into the scene
+    scene_objects = [
+        load_obj("v4/cube.obj", scale=1.0, translate=(-2, -2, 0)),
+        load_obj("v4/cube.obj", scale=1.0, translate=(2, 2, 0)),
+        load_obj("v4/pyramid.obj", scale=1.0, translate=(0, 0, 0)),
+    ]
+    
+    # Flatten into a single list of triangles
+    scene_faces = list(itertools.chain.from_iterable(scene_objects))
+    
+    running = True
+    while running:
+        dt = clock.tick(60) / 1000.0  # in seconds
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Scroll wheel up/down
+                if event.button == 4:   # wheel up
+                    plane_angle += 5.0
+                elif event.button == 5: # wheel down
+                    plane_angle -= 5.0
+        
+        # Handle keyboard input
+        keys = pygame.key.get_pressed()
+        move_speed = 1.0 * dt
+        
+        if keys[pygame.K_w]:
+            camera_y += move_speed
+        if keys[pygame.K_s]:
+            camera_y -= move_speed
+        if keys[pygame.K_a]:
+            camera_x -= move_speed
+        if keys[pygame.K_d]:
+            camera_x += move_speed
+        
+        if keys[pygame.K_ESCAPE]:
+            running = False
+        
+        # Define plane normal by rotating (1,0,0) around +Z by plane_angle
+        rad = math.radians(plane_angle)
+        nx = math.cos(rad)
+        ny = math.sin(rad)
+        nz = 0.0
+        plane_normal = (nx, ny, nz)
+        
+        camera_pos = (camera_x, camera_y, camera_z)
+        
+        # Compute the intersection polygons for the slicing plane
+        polygons_2d = compute_slice_polygons(scene_faces, camera_pos, plane_normal)
+        
+        screen.fill(BG_COLOR)
+        # Draw the cross-section polygons
+        draw_polygons_2d(polygons_2d, screen, SLICE_COLOR, scale=200.0)
+        
+        # Simple on-screen instructions:
+        info_text = [
+            "W/A/S/D to move camera (XY plane)",
+            "Mouse Scroll Wheel to rotate plane around Z-axis",
+            f"Camera = ({camera_x:.2f}, {camera_y:.2f}, {camera_z:.2f})",
+            f"Plane Angle = {plane_angle:.1f} deg",
+        ]
+        font = pygame.font.SysFont(None, 24)
+        yoff = 10
+        for line in info_text:
+            txt_surf = font.render(line, True, (200,200,200))
+            screen.blit(txt_surf, (10, yoff))
+            yoff += 22
+        
+        pygame.display.flip()
+    
+    pygame.quit()
+    sys.exit()
+
 if __name__ == "__main__":
-    main()
+    main_with_multiple_objects()
