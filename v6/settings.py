@@ -16,10 +16,11 @@ class DisplaySettings:
 class MovementSettings:
     acceleration: float = 0.02
     max_velocity: float = 5.0
-    friction: float = 0.9
+    friction: float = 0.95
     rotate_speed: float = 0.06545  # pi/48
     user_width_pixels: int = 20
     user_height_pixels: int = 30
+    bounce_factor: float = 0.5
 
     def get_collision_dimensions(self, pixels_per_unit: float) -> Tuple[float, float]:
         """Convert pixel dimensions to world units for collision detection"""

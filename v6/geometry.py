@@ -120,6 +120,24 @@ class GeometryHelper:
             return [points_2d[i] for i in hull.vertices]
         except:
             return points_2d
+        
+    @staticmethod
+    def get_collision_normal(hull1: List[Tuple[float, float]], hull2: List[Tuple[float, float]], 
+                            pos1: np.ndarray, pos2: np.ndarray) -> Optional[np.ndarray]:
+        """Calculate normal vector pointing from hull2 to hull1"""
+        if not hull1 or not hull2:
+            return None
+        
+        # Get centers
+        center1 = np.mean(hull1, axis=0)
+        center2 = np.mean(hull2, axis=0)
+        
+        # Direction from shape to user
+        normal = center1 - center2
+        if np.linalg.norm(normal) < 1e-6:
+            return np.array([1.0, 0.0])  # Default if centers are too close
+            
+        return normal / np.linalg.norm(normal)
 
     @staticmethod
     def check_collision(hull1: List[Tuple[float, float]], hull2: List[Tuple[float, float]]) -> bool:

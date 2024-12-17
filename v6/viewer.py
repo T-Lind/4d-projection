@@ -83,21 +83,34 @@ class PlaneSliceViewer:
         if np.linalg.norm(self.velocity) > 0.01:
             self.user_pos += self.velocity
             self._compute_all_intersections()
-            
-            # Collision Detection
-            user_shape = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
-            collision = False
-            for shape in self.settings.shapes:
-                shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
-                if self.geometry.check_collision(user_shape, shape_hull):
-                    print("COLLISION!")
-                    collision = True
-                    break
-            if collision:
-                self.user_pos = previous_pos
-                self.velocity = np.array([0.0, 0.0, 0.0], dtype=float)
-        else:
-            self.velocity = np.array([0.0, 0.0, 0.0], dtype=float)
+        
+        # Collision Detection
+        user_shape = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
+        collision = False
+        for shape in self.settings.shapes:
+            shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
+            if self.geometry.check_collision(user_shape, shape_hull):
+                # Get collision normal
+                normal = self.geometry.get_collision_normal(user_shape, shape_hull, 
+                                                         self.user_pos, np.zeros(3))
+                if normal is not None:
+                    # Reflect velocity off normal with bounce factor
+                    normal_2d = np.array([normal[0], normal[1]])
+                    velocity_2d = np.array([self.velocity[0], self.velocity[1]])
+                    
+                    # Reflection formula: v' = v - 2(v·n)n
+                    reflected = velocity_2d - 2 * np.dot(velocity_2d, normal_2d) * normal_2d
+                    
+                    # Apply bounce factor
+                    self.velocity[0] = reflected[0] * self.settings.movement.bounce_factor
+                    self.velocity[1] = reflected[1] * self.settings.movement.bounce_factor
+                    self.velocity[2] *= self.settings.movement.bounce_factor
+                
+                collision = True
+                break
+                
+        if collision:
+            self.user_pos = previous_pos
 
     def _compute_all_intersections(self):
         self.intersection_coords_2D = []
