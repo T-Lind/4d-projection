@@ -8,6 +8,7 @@ class DisplaySettings:
     pixels_per_unit: float
     background_color: Tuple[int, int, int]
     origin_color: Tuple[int, int, int]
+    user_color: Tuple[int, int, int]
     default_shape_color: List[int]
     window_size: Tuple[int, int]
     
@@ -17,6 +18,15 @@ class MovementSettings:
     max_velocity: float = 5.0
     friction: float = 0.9
     rotate_speed: float = 0.06545  # pi/48
+    user_width_pixels: int = 20
+    user_height_pixels: int = 30
+
+    def get_collision_dimensions(self, pixels_per_unit: float) -> Tuple[float, float]:
+        """Convert pixel dimensions to world units for collision detection"""
+        return (
+            self.user_width_pixels / pixels_per_unit,
+            self.user_height_pixels / pixels_per_unit
+        )
 
 class Settings:
     def __init__(self, config_path: Optional[str] = None):
@@ -40,6 +50,7 @@ class Settings:
             pixels_per_unit=float(settings.get('pixels_per_unit', 100.0)),
             background_color=tuple(settings.get('background_color', [30, 30, 30])),
             origin_color=tuple(settings.get('origin_color', [255, 0, 0])),
+            user_color=tuple(settings.get('user_color', [255, 255, 255])),
             default_shape_color=settings.get('default_shape_color', [100, 200, 255]),
             window_size=(800, 600)
         )

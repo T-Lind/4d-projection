@@ -50,9 +50,35 @@ class Renderer:
         screen_pt2 = self._to_screen_coords(pt2)
         pygame.draw.line(self.screen, color, screen_pt1, screen_pt2, 2)
 
+    def draw_debug_hulls(self, user_hull, shape_hulls):
+        """Debug visualization of collision hulls"""
+        # Draw user hull
+        if user_hull:
+            points = [self._to_screen_coords(p) for p in user_hull]
+            pygame.draw.polygon(self.screen, (0, 255, 0), points, 1)
+        
+        # Draw shape hulls
+        for hull in shape_hulls:
+            if hull:
+                points = [self._to_screen_coords(p) for p in hull]
+                pygame.draw.polygon(self.screen, (255, 0, 0), points, 1)
+
     def draw_origin_marker(self):
         pygame.draw.circle(self.screen, self.settings.display.origin_color, 
                          self.center_2D, 5)
+        
+    def draw_user(self):
+        user_screen_pos = self.center_2D
+        width = self.settings.movement.user_width_pixels
+        height = self.settings.movement.user_height_pixels
+        
+        rect_x = user_screen_pos[0] - width // 2
+        rect_y = user_screen_pos[1] - height // 2
+        
+        pygame.draw.rect(self.screen, self.settings.display.user_color, 
+                        (rect_x, rect_y, width, height))
+        pygame.draw.rect(self.screen, (0, 0, 0), 
+                        (rect_x, rect_y, width, height), 1)
 
     def draw_status_text(self, user_pos: np.ndarray, plane_angle: float):
         coord_text = f"User Position: (X: {user_pos[0]:.2f}, Y: {user_pos[1]:.2f}, Z: {user_pos[2]:.2f})"

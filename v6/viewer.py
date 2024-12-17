@@ -76,10 +76,26 @@ class PlaneSliceViewer:
         # Apply friction
         self.velocity *= self.settings.movement.friction
 
+        # Store previous position
+        previous_pos = self.user_pos.copy()
+        
         # Update position if moving
         if np.linalg.norm(self.velocity) > 0.01:
             self.user_pos += self.velocity
             self._compute_all_intersections()
+            
+            # Collision Detection
+            user_shape = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
+            collision = False
+            for shape in self.settings.shapes:
+                shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
+                if self.geometry.check_collision(user_shape, shape_hull):
+                    print("COLLISION!")
+                    collision = True
+                    break
+            if collision:
+                self.user_pos = previous_pos
+                self.velocity = np.array([0.0, 0.0, 0.0], dtype=float)
         else:
             self.velocity = np.array([0.0, 0.0, 0.0], dtype=float)
 
@@ -99,6 +115,12 @@ class PlaneSliceViewer:
                                 self.intersection_coords_2D, 
                                 self.intersection_edges)
         self.renderer.draw_origin_marker()
+        self.renderer.draw_user()
+        # Debug visualization
+        user_hull = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
+        shape_hulls = [self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle) for shape in self.settings.shapes]
+        self.renderer.draw_debug_hulls(user_hull, shape_hulls)
+        
         self.renderer.draw_status_text(self.user_pos, self.plane_angle)
         self.renderer.update_display()
 
