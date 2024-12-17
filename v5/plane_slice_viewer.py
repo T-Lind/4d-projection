@@ -67,7 +67,7 @@ def project_point_onto_plane_2D(point_3d, user_pos, plane_angle):
 #
 
 def main():
-    parser = argparse.ArgumentParser(description="Vertical Plane Slice Viewer")
+    parser = argparse.ArgumentParser(description="Vertical Plane Slice Viewer with Enhanced Features")
     parser.add_argument("file", nargs='?', default=None, help="Path to config JSON file")
     args = parser.parse_args()
 
@@ -78,11 +78,18 @@ def main():
                 config = json.load(f)
         else:
             # Fallback if no file is provided
-            with open('v3/3d_demo_file.json', 'r') as f:
+            with open('v5/shapes_config.json', 'r') as f:
                 config = json.load(f)
     except Exception as e:
         print("Error loading config JSON:", e)
         sys.exit(1)
+
+    # Extract settings
+    settings = config.get('settings', {})
+    pixels_per_unit = settings.get('pixels_per_unit', 100.0)
+    BACKGROUND_COLOR = tuple(settings.get('background_color', [30, 30, 30]))
+    ORIGIN_COLOR = tuple(settings.get('origin_color', [255, 0, 0]))
+    DEFAULT_SHAPE_COLOR = settings.get('default_shape_color', [100, 200, 255])
 
     # Pygame initialization
     pygame.init()
@@ -90,14 +97,8 @@ def main():
     screen = pygame.display.set_mode(display_size)
     pygame.display.set_caption("Vertical Plane Slice Viewer")
 
-    # Define colors
-    BACKGROUND_COLOR = (30, 30, 30)
-    ORIGIN_COLOR = (255, 0, 0)  # Red
-    DEFAULT_SHAPE_COLOR = (100, 200, 255)  # Light Blue
-
     # We'll draw in 2D: The plane's coordinate system is (X axis horizontal, Z axis vertical).
-    # We'll define a scale factor to visually spread out the geometry on screen:
-    pixels_per_unit = 100.0
+    # Define the center of the screen
     center_2D = (display_size[0] // 2, display_size[1] // 2)
 
     # User position in 3D
@@ -106,12 +107,17 @@ def main():
     plane_angle = 0.0
 
     # Movement parameters
-    move_speed = 0.2  # Units per frame
+    acceleration = 0.02  # Units per frame^2
+    max_velocity = 5.0    # Max speed
+    friction = 0.9       # Friction coefficient (0 < friction < 1)
     rotate_speed = np.pi / 48  # Radians per scroll event
 
     # Clock for consistent framerate
     clock = pygame.time.Clock()
     running = True
+
+    # Velocity vectors
+    velocity = np.array([0.0, 0.0, 0.0], dtype=float)
 
     # A function to get intersection polygons for each shape
     def compute_all_intersections():
@@ -162,7 +168,7 @@ def main():
 
         return intersection_coords_2D, intersection_edges
 
-    # Precompute
+    # Precompute intersections
     intersection_coords_2D, intersection_edges = compute_all_intersections()
 
     # Key state tracking for smooth movement
@@ -202,66 +208,90 @@ def main():
                     plane_angle %= 2 * np.pi
                     intersection_coords_2D, intersection_edges = compute_all_intersections()
 
-        # Handle continuous key presses for smooth movement
-        movement_vector = np.array([0.0, 0.0, 0.0], dtype=float)
+        # Handle continuous key presses for smooth movement with momentum
+        movement_acceleration = np.array([0.0, 0.0, 0.0], dtype=float)
 
         if keys_pressed[K_w]:
-            movement_vector[2] += move_speed  # Move up along Z
+            movement_acceleration[2] += acceleration  # Move up along Z
         if keys_pressed[K_s]:
-            movement_vector[2] -= move_speed  # Move down along Z
+            movement_acceleration[2] -= acceleration  # Move down along Z
         if keys_pressed[K_a]:
             # Move left in plane
             p_x = np.array([-np.sin(plane_angle), np.cos(plane_angle), 0.0], dtype=float)
-            movement_vector += -move_speed * p_x
+            movement_acceleration += -acceleration * p_x
         if keys_pressed[K_d]:
             # Move right in plane
             p_x = np.array([-np.sin(plane_angle), np.cos(plane_angle), 0.0], dtype=float)
-            movement_vector += move_speed * p_x
+            movement_acceleration += acceleration * p_x
 
-        if np.linalg.norm(movement_vector) > 0:
-            user_pos += movement_vector
+        # Update velocity with acceleration
+        velocity += movement_acceleration
+
+        # Limit velocity to max_velocity
+        speed = np.linalg.norm(velocity)
+        if speed > max_velocity:
+            velocity = (velocity / speed) * max_velocity
+
+        # Apply friction
+        velocity *= friction
+
+        # Update user position
+        if np.linalg.norm(velocity) > 0.01:  # Threshold to stop completely
+            user_pos += velocity
             intersection_coords_2D, intersection_edges = compute_all_intersections()
+        else:
+            velocity = np.array([0.0, 0.0, 0.0], dtype=float)
 
         # --- Draw 2D slice ---
         screen.fill(BACKGROUND_COLOR)  # Background color
 
         shapes = config.get('shapes', [])
         for i, shape in enumerate(shapes):
-            color = shape.get('color', None)
-            if color is None:
-                # Default color
-                color = DEFAULT_SHAPE_COLOR
-            elif isinstance(color, list) or isinstance(color, tuple):
-                if all(0.0 <= c <= 1.0 for c in color):
-                    # Assuming color components are floats in [0,1]
-                    color = tuple(int(255 * c) for c in color)
-                elif all(0 <= c <= 255 for c in color):
-                    # Assuming color components are already in [0,255]
-                    color = tuple(color)
-                else:
-                    # Fallback to default if color format is unrecognized
-                    color = DEFAULT_SHAPE_COLOR
-            else:
-                # Fallback to default if color format is unrecognized
-                color = DEFAULT_SHAPE_COLOR
+            color_dict = shape.get('color', {})
+            # Extract RGB components, defaulting to the global default if missing
+            r = int(color_dict.get('r', DEFAULT_SHAPE_COLOR[0] / 255.0) * 255)
+            g = int(color_dict.get('g', DEFAULT_SHAPE_COLOR[1] / 255.0) * 255)
+            b = int(color_dict.get('b', DEFAULT_SHAPE_COLOR[2] / 255.0) * 255)
+            color = (r, g, b)
 
             coords_2d = intersection_coords_2D[i]
             edges_2d = intersection_edges[i]
 
-            # Draw the edges
-            for e in edges_2d:
-                i1, i2 = e
-                if i1 >= len(coords_2d) or i2 >= len(coords_2d):
-                    continue  # Skip invalid indices
-                pt1 = coords_2d[i1]
-                pt2 = coords_2d[i2]
+            # To fill the shape, we need the ordered list of points forming the polygon
+            # We'll attempt to retrieve them from the ConvexHull or directly connect edges
+            polygon = []
 
+            if len(coords_2d) >= 3:
+                try:
+                    hull = ConvexHull(coords_2d)
+                    hull_indices = hull.vertices
+                    polygon = [coords_2d[j] for j in hull_indices]
+                except:
+                    # If ConvexHull fails, fallback to drawing lines only
+                    pass
+            elif len(coords_2d) == 2:
+                # Not enough points to form a polygon
+                pass
+
+            if len(polygon) >= 3:
                 # Convert plane coords (X,Z) to screen coords
+                polygon_screen = []
+                for pt in polygon:
+                    x_screen = int(center_2D[0] + pt[0] * pixels_per_unit)
+                    y_screen = int(center_2D[1] - pt[1] * pixels_per_unit)  # Y inversion for screen
+                    polygon_screen.append((x_screen, y_screen))
+                # Draw filled polygon
+                pygame.draw.polygon(screen, color, polygon_screen)
+                # Optionally, draw the edges for better visibility
+                pygame.draw.polygon(screen, (0, 0, 0), polygon_screen, 1)  # Black edges
+
+            elif len(coords_2d) == 2:
+                # Draw a single line segment
+                pt1, pt2 = coords_2d
                 x1_screen = int(center_2D[0] + pt1[0] * pixels_per_unit)
-                y1_screen = int(center_2D[1] - pt1[1] * pixels_per_unit)  # Y inversion for screen
+                y1_screen = int(center_2D[1] - pt1[1] * pixels_per_unit)
                 x2_screen = int(center_2D[0] + pt2[0] * pixels_per_unit)
                 y2_screen = int(center_2D[1] - pt2[1] * pixels_per_unit)
-
                 pygame.draw.line(screen, color, (x1_screen, y1_screen), (x2_screen, y2_screen), 2)
 
         # Draw a small marker for the user's origin in plane-coords
