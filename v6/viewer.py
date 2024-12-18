@@ -44,11 +44,13 @@ class PlaneSliceViewer:
         self.points = 10000
         self.points_decrease_rate = 1
         self.jump_penalty = 100
+        self.death_penalty = 1000
                 
     def _check_fall_condition(self):
         """Check if player has fallen below threshold"""
         if self.user_pos[2] < self.settings.gameplay.fall_threshold:
             self._reset_player()
+            self.points -= self.death_penalty
             
     def _reset_player(self):
         """Reset player to spawn position"""
@@ -64,6 +66,25 @@ class PlaneSliceViewer:
         self.current_pulse_factor = pulse_factor
         return pulse_factor
     
+    def _adjust_user_position_after_rotation(self):
+        """Move the user up if colliding after rotation."""
+        max_adjustment = 10.0  # Maximum height to adjust
+        adjustment_step = 0.1  # Step size for adjustment
+        total_adjustment = 0.0
+
+        while total_adjustment < max_adjustment:
+            collision = False
+            user_shape = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
+            for shape in self.settings.shapes:
+                shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
+                if self.geometry.check_collision(user_shape, shape_hull):
+                    collision = True
+                    break
+            if collision:
+                self.user_pos[2] += adjustment_step
+                total_adjustment += adjustment_step
+            else:
+                break
 
     def _handle_events(self):
         for event in pygame.event.get():
@@ -73,7 +94,7 @@ class PlaneSliceViewer:
 
             if event.type == KEYDOWN and event.key in self.keys_pressed:
                 self.keys_pressed[event.key] = True
-                if event.key == K_SPACE:
+                if event.key == K_SPACE or event.key == K_w:
                     self.points -= self.jump_penalty
             elif event.type == KEYUP and event.key in self.keys_pressed:
                 self.keys_pressed[event.key] = False
@@ -82,9 +103,11 @@ class PlaneSliceViewer:
                 if event.button == 4:  # Scroll up
                     self.plane_angle = (self.plane_angle + self.settings.movement.rotate_speed) % (2 * np.pi)
                     self._compute_all_intersections()
+                    self._adjust_user_position_after_rotation()
                 elif event.button == 5:  # Scroll down
                     self.plane_angle = (self.plane_angle - self.settings.movement.rotate_speed) % (2 * np.pi)
                     self._compute_all_intersections()
+                    self._adjust_user_position_after_rotation()
 
     def _handle_level_completion(self):
         self.renderer.render_win_message()
@@ -104,7 +127,7 @@ class PlaneSliceViewer:
         
         # Handle jumping
         if (self.keys_pressed[K_SPACE] or self.keys_pressed[K_w]) and self.ground_contact:
-            self.velocity[2] = self.settings.movement.jump_velocity  # You'll need to add this to settings
+            self.velocity[2] = self.settings.movement.jump_velocity
             self.ground_contact = False
 
         if self.keys_pressed[K_s]:
