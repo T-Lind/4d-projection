@@ -34,6 +34,31 @@ class PlaneSliceViewer:
         # Compute initial intersections
         self._compute_all_intersections()
 
+        self.level_complete = False
+        self.spawn_position = np.array(settings.gameplay.spawn_position, dtype=float)
+        self.user_pos = self.spawn_position.copy()
+        self.target_pulse_time = 0
+                
+    def _check_fall_condition(self):
+        """Check if player has fallen below threshold"""
+        if self.user_pos[2] < self.settings.gameplay.fall_threshold:
+            self._reset_player()
+            
+    def _reset_player(self):
+        """Reset player to spawn position"""
+        self.user_pos = self.spawn_position.copy()
+        self.velocity = np.zeros(3, dtype=float)
+        self._compute_all_intersections()
+        
+    def _update_target_pulse(self):
+        """Update target pulsing animation"""
+        self.target_pulse_time += 1/60  # Assuming 60 FPS
+        pulse_factor = (np.sin(self.target_pulse_time * 2 * np.pi * 
+                        self.settings.gameplay.target_pulse_rate) + 1) / 2
+        self.current_pulse_factor = pulse_factor
+        return pulse_factor
+    
+
     def _handle_events(self):
         for event in pygame.event.get():
             if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
@@ -95,6 +120,12 @@ class PlaneSliceViewer:
         for shape in self.settings.shapes:
             shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
             if self.geometry.check_collision(user_shape, shape_hull):
+                shape_name = shape.get('name', 'floor')
+                print(f"Collision with: {shape_name}")
+                if shape.get('is_target', False):
+                    self.level_complete = True
+                    print("Level Complete!")
+
                 # Get collision normal
                 normal = self.geometry.get_collision_normal(user_shape, shape_hull, 
                                                          self.user_pos, np.zeros(3))
@@ -114,7 +145,6 @@ class PlaneSliceViewer:
                 collision = True
                 self.ground_contact = True
                 break
-                break
                 
         if collision:
             self.user_pos = previous_pos
@@ -129,17 +159,39 @@ class PlaneSliceViewer:
             self.intersection_coords_2D.append(points_2d)
             self.intersection_edges.append(edges)
 
+    def _update(self):
+        if not self.level_complete:
+            self._update_physics()
+            self._check_fall_condition()
+            self._update_target_pulse()
+
     def _render(self):
         self.renderer.clear_screen()
-        self.renderer.draw_shapes(self.settings.shapes, 
-                                self.intersection_coords_2D, 
+        self.renderer.draw_shapes(self.settings.shapes,
+                                self.intersection_coords_2D,
                                 self.intersection_edges)
+        
+        # Target shapes with pulsing border
+        target_shapes = [s for s in self.settings.shapes if s.get('is_target')]
+        target_idx = [i for i, s in enumerate(self.settings.shapes) if s.get('is_target')]
+        if target_shapes:
+            pulse_factor = self.current_pulse_factor if hasattr(self, 'current_pulse_factor') else 1.0
+            for i in target_idx:
+                coords = self.intersection_coords_2D[i]
+                edges = self.intersection_edges[i]
+                self.renderer.draw_pulsing_target(coords, edges, pulse_factor)
+        
+    
+
         self.renderer.draw_origin_marker()
         self.renderer.draw_user()
         # Debug visualization
         user_hull = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
         shape_hulls = [self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle) for shape in self.settings.shapes]
         self.renderer.draw_debug_hulls(user_hull, shape_hulls)
+
+        if self.level_complete:
+            self.renderer._render_win_message()
         
         self.renderer.draw_status_text(self.user_pos, self.plane_angle)
         self.renderer.update_display()
@@ -148,7 +200,7 @@ class PlaneSliceViewer:
         while self.running:
             self.clock.tick(60)
             self._handle_events()
-            self._update_physics()
+            self._update()
             self._render()
         
         self.renderer.quit()

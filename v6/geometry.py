@@ -140,7 +140,7 @@ class GeometryHelper:
         return normal / np.linalg.norm(normal)
 
     @staticmethod
-    def check_collision(hull1: List[Tuple[float, float]], hull2: List[Tuple[float, float]]) -> bool:
+    def check_collision(hull1: List[Tuple[float, float]], hull2: List[Tuple[float, float]], margin: int = 0) -> bool:
         """
         Check collision between two convex hulls using the Separating Axis Theorem.
         """

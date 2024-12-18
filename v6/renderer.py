@@ -16,6 +16,28 @@ class Renderer:
 
     def clear_screen(self):
         self.screen.fill(self.settings.display.background_color)
+    
+
+    def draw_pulsing_target(self, coords_2d: List[Tuple[float, float]], 
+                            edges: List[Tuple[int, int]], pulse_factor: float):
+        try:
+            hull = ConvexHull(coords_2d)
+            hull_indices = hull.vertices
+            polygon = [coords_2d[j] for j in hull_indices]
+            
+            # Convert to screen coordinates
+            polygon_screen = [self._to_screen_coords(pt) for pt in polygon]
+            
+            # Define golden color pulsing
+            golden_color = (
+                int(255 * pulse_factor), 
+                int(215 * pulse_factor), 
+                0
+            )
+            
+            pygame.draw.polygon(self.screen, golden_color, polygon_screen, 3)
+        except:
+            pass
 
     def draw_shapes(self, shapes: List[dict], 
                    intersection_coords_2D: List[List[Tuple[float, float]]], 
@@ -90,6 +112,28 @@ class Renderer:
         
         self.screen.blit(text_surface1, (10, 10))
         self.screen.blit(text_surface2, (10, 30))
+
+    def _render_win_message(self):
+        """Draw centered win message overlay"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface(self.settings.display.window_size)
+        overlay.set_alpha(128)
+        overlay.fill((0, 0, 0))
+        self.screen.blit(overlay, (0,0))
+        
+        # Win message
+        font = pygame.font.SysFont(None, 64)
+        text = font.render("Level Complete!", True, (255, 215, 0))
+        text_rect = text.get_rect(center=(self.settings.display.window_size[0]/2,
+                                        self.settings.display.window_size[1]/2))
+        self.screen.blit(text, text_rect)
+
+    def draw_level_info(self, level_name: str, level_number: int):
+        """Draw level information in top-right corner"""
+        text = f"Level {level_number}: {level_name}"
+        text_surface = self.font.render(text, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(topright=(self.settings.display.window_size[0] - 10, 10))
+        self.screen.blit(text_surface, text_rect)
 
     def _to_screen_coords(self, point: Tuple[float, float]) -> Tuple[int, int]:
         return (

@@ -30,12 +30,21 @@ class MovementSettings:
             self.user_width_pixels / pixels_per_unit,
             self.user_height_pixels / pixels_per_unit
         )
+    
+@dataclass(frozen=True)
+class GameplaySettings:
+    fall_threshold: float = -10.0  # Y position that triggers reset
+    spawn_position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    target_color: Tuple[int, int, int] = (0, 255, 0)
+    target_pulse_rate: float = 0.5  # Seconds per pulse
+    target_pulse_magnitude: float = 0.3  # Color intensity variation
 
 class Settings:
     def __init__(self, config_path: Optional[str] = None):
         self.config_path = config_path or os.path.join('v5', 'shapes_config.json')
         self.config_data = self._load_config()
         self.display = self._init_display_settings()
+        self.gameplay = GameplaySettings()
         self.movement = MovementSettings()
         self.shapes = self.config_data.get('shapes', [])
 
