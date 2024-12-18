@@ -5,10 +5,12 @@ from typing import List, Tuple, Dict
 from settings import Settings
 from geometry import GeometryHelper
 from renderer import Renderer
+from level_manager import LevelManager
 
 class PlaneSliceViewer:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, level_manager: LevelManager):
         self.settings = settings
+        self.level_manager = level_manager
         self.renderer = Renderer(settings)
         self.geometry = GeometryHelper()
         
@@ -38,6 +40,10 @@ class PlaneSliceViewer:
         self.spawn_position = np.array(settings.gameplay.spawn_position, dtype=float)
         self.user_pos = self.spawn_position.copy()
         self.target_pulse_time = 0
+
+        self.points = 10000
+        self.points_decrease_rate = 1
+        self.jump_penalty = 100
                 
     def _check_fall_condition(self):
         """Check if player has fallen below threshold"""
@@ -67,6 +73,8 @@ class PlaneSliceViewer:
 
             if event.type == KEYDOWN and event.key in self.keys_pressed:
                 self.keys_pressed[event.key] = True
+                if event.key == K_SPACE:
+                    self.points -= self.jump_penalty
             elif event.type == KEYUP and event.key in self.keys_pressed:
                 self.keys_pressed[event.key] = False
             
@@ -77,6 +85,19 @@ class PlaneSliceViewer:
                 elif event.button == 5:  # Scroll down
                     self.plane_angle = (self.plane_angle - self.settings.movement.rotate_speed) % (2 * np.pi)
                     self._compute_all_intersections()
+
+    def _handle_level_completion(self):
+        self.renderer.render_win_message()
+        self.renderer.update_display()
+        waiting = True
+        while waiting:
+            for event in pygame.event.get():
+                if event.type == KEYDOWN and event.key == K_RETURN:
+                    waiting = False
+                elif event.type == QUIT:
+                    self.running = False
+                    waiting = False
+        self.running = False
 
     def _update_physics(self):
         movement_acceleration = np.array([0.0, 0.0, -self.settings.movement.gravity], dtype=float)
@@ -120,11 +141,8 @@ class PlaneSliceViewer:
         for shape in self.settings.shapes:
             shape_hull = self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle)
             if self.geometry.check_collision(user_shape, shape_hull):
-                shape_name = shape.get('name', 'floor')
-                print(f"Collision with: {shape_name}")
                 if shape.get('is_target', False):
                     self.level_complete = True
-                    print("Level Complete!")
 
                 # Get collision normal
                 normal = self.geometry.get_collision_normal(user_shape, shape_hull, 
@@ -164,6 +182,9 @@ class PlaneSliceViewer:
             self._update_physics()
             self._check_fall_condition()
             self._update_target_pulse()
+            self.points -= self.points_decrease_rate
+            if self.points < 0:
+                self.points = 0
 
     def _render(self):
         self.renderer.clear_screen()
@@ -193,7 +214,7 @@ class PlaneSliceViewer:
         if self.level_complete:
             self.renderer._render_win_message()
         
-        self.renderer.draw_status_text(self.user_pos, self.plane_angle)
+        self.renderer.draw_status_text(self.user_pos, self.plane_angle, self.points)
         self.renderer.update_display()
 
     def run(self):
