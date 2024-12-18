@@ -23,8 +23,10 @@ class PlaneSliceViewer:
             K_w: False,
             K_s: False,
             K_a: False,
-            K_d: False
+            K_d: False,
+            K_SPACE: False,
         }
+        self.ground_contact = False
         
         # Clock for consistent framerate
         self.clock = pygame.time.Clock()
@@ -52,10 +54,13 @@ class PlaneSliceViewer:
                     self._compute_all_intersections()
 
     def _update_physics(self):
-        movement_acceleration = np.array([0.0, 0.0, 0.0], dtype=float)
+        movement_acceleration = np.array([0.0, 0.0, -self.settings.movement.gravity], dtype=float)
         
-        if self.keys_pressed[K_w]:
-            movement_acceleration[2] += self.settings.movement.acceleration
+        # Handle jumping
+        if (self.keys_pressed[K_SPACE] or self.keys_pressed[K_w]) and self.ground_contact:
+            self.velocity[2] = self.settings.movement.jump_velocity  # You'll need to add this to settings
+            self.ground_contact = False
+
         if self.keys_pressed[K_s]:
             movement_acceleration[2] -= self.settings.movement.acceleration
         if self.keys_pressed[K_a]:
@@ -107,6 +112,8 @@ class PlaneSliceViewer:
                     self.velocity[2] *= self.settings.movement.bounce_factor
                 
                 collision = True
+                self.ground_contact = True
+                break
                 break
                 
         if collision:

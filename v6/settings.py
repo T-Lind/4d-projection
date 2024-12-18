@@ -21,6 +21,8 @@ class MovementSettings:
     user_width_pixels: int = 20
     user_height_pixels: int = 30
     bounce_factor: float = 0.5
+    gravity: float = 0.01
+    jump_velocity: float = 0.3;
 
     def get_collision_dimensions(self, pixels_per_unit: float) -> Tuple[float, float]:
         """Convert pixel dimensions to world units for collision detection"""
