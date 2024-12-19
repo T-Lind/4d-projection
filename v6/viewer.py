@@ -118,13 +118,12 @@ class PlaneSliceViewer:
         self.renderer.render_win_message()
         self.renderer.update_display()
         waiting = True
-        self.assets.play_sound('complete')
         while waiting:
             for event in pygame.event.get():
                 if event.type == KEYDOWN and event.key == K_RETURN:
                     waiting = False
         self.running = False
-
+        
 
     def _update_physics(self):
         movement_acceleration = np.array([0.0, 0.0, -self.settings.movement.gravity], dtype=float)

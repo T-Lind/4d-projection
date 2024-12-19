@@ -21,9 +21,10 @@ class AssetManager:
     def _init_fonts(self):
         pygame.font.init()
         self.fonts = {
-            'title': pygame.font.Font(None, 74),
-            'menu': pygame.font.Font(None, 48),
-            'hud': pygame.font.Font(None, 24)
+            'pixel_8': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 8),
+            'pixel_16': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 16),
+            'pixel_24': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 24),
+
         }
         
     def _init_sounds(self):

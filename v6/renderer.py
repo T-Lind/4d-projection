@@ -3,6 +3,7 @@ import numpy as np
 from typing import List, Tuple, Optional
 from scipy.spatial import ConvexHull
 from settings import Settings
+from asset_manager import AssetManager
 
 class Renderer:
     def __init__(self, settings: Settings):
@@ -10,7 +11,8 @@ class Renderer:
         self.settings = settings
         self.screen = pygame.display.set_mode(settings.display.window_size)
         pygame.display.set_caption("Vertical Plane Slice Viewer")
-        self.font = pygame.font.SysFont(None, 24)
+        self.assets = AssetManager()
+        self.font = self.assets.get_font('pixel_8')
         self.center_2D = (settings.display.window_size[0] // 2, 
                          settings.display.window_size[1] // 2)
 

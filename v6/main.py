@@ -5,7 +5,7 @@ from settings import Settings
 from viewer import PlaneSliceViewer
 
 def main():
-    parser = argparse.ArgumentParser(description="Vertical Plane Slice Viewer with Enhanced Features")
+    parser = argparse.ArgumentParser(description="Plane Game")
     parser.add_argument("--start-level", type=int, default=1, help="Level number to start from")
     args = parser.parse_args()
     
