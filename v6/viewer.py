@@ -6,16 +6,18 @@ from settings import Settings
 from geometry import GeometryHelper
 from renderer import Renderer
 from level_manager import LevelManager, GameState
-# from menu_manager import MenuManager
+from menu_manager import MenuManager
 from asset_manager import AssetManager
 
 class PlaneSliceViewer:
-    def __init__(self, settings: Settings, level_manager: LevelManager):
+    def __init__(self, settings: Settings, level_manager: LevelManager, assets: AssetManager):
         self.settings = settings
         self.level_manager = level_manager
-        self.renderer = Renderer(settings)
+        self.renderer = Renderer(settings, assets)
         self.geometry = GeometryHelper()
-        self.assets = AssetManager()
+        self.assets = assets
+        self.state = GameState.GAME
+        self.menu = MenuManager(level_manager, assets, in_game=True)
         self.assets.play_music()
         
         # State
@@ -93,9 +95,13 @@ class PlaneSliceViewer:
 
     def _handle_events(self):
         for event in pygame.event.get():
-            if event.type == QUIT or (event.type == KEYDOWN and event.key == K_ESCAPE):
+            if event.type == pygame.QUIT:
                 self.running = False
-                return
+                pygame.quit()
+                exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self._pause_game()
 
             if event.type == KEYDOWN and event.key in self.keys_pressed:
                 self.keys_pressed[event.key] = True
@@ -114,15 +120,33 @@ class PlaneSliceViewer:
                     self._compute_all_intersections()
                     self._adjust_user_position_after_rotation()
 
+    def _pause_game(self):
+        self.state = GameState.PAUSE
+        self.menu.run_pause_menu(self.renderer.screen)
+        if self.menu.resume_game:
+            self.state = GameState.GAME
+        elif self.menu.return_to_main:
+            self.running = False
+            self.level_complete = False
+            self.level_manager.current_level = None  # This can signal main.py to show main menu
+
+
     def _handle_level_completion(self):
         self.renderer.render_win_message()
         self.renderer.update_display()
         waiting = True
         while waiting:
             for event in pygame.event.get():
-                if event.type == KEYDOWN and event.key == K_RETURN:
-                    waiting = False
+                if event.type == pygame.KEYDOWN:
+                    if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                        waiting = False
+                elif event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+            pygame.time.delay(100)
+        self.level_complete = True
         self.running = False
+
         
 
     def _update_physics(self):
@@ -235,9 +259,9 @@ class PlaneSliceViewer:
         self.renderer.draw_origin_marker()
         self.renderer.draw_user()
         # Debug visualization
-        user_hull = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
-        shape_hulls = [self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle) for shape in self.settings.shapes]
-        self.renderer.draw_debug_hulls(user_hull, shape_hulls)
+        # user_hull = self.geometry.get_user_convex_hull(self.user_pos, self.plane_angle, self.settings)
+        # shape_hulls = [self.geometry.get_convex_hull(shape, self.user_pos, self.plane_angle) for shape in self.settings.shapes]
+        # self.renderer.draw_debug_hulls(user_hull, shape_hulls)
 
         if self.level_complete:
             self.renderer._render_win_message()
@@ -247,9 +271,11 @@ class PlaneSliceViewer:
 
     def run(self):
         while self.running:
-            self.clock.tick(60)
-            self._handle_events()
-            self._update()
-            self._render()
-        
-        self.renderer.quit()
+            if self.state == GameState.GAME:
+                self._handle_events()
+                self._update()
+                self._render()
+                pygame.display.flip()
+                self.clock.tick(60)
+            elif self.state == GameState.PAUSE:
+                pygame.time.delay(100)

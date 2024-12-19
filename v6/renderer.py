@@ -6,13 +6,16 @@ from settings import Settings
 from asset_manager import AssetManager
 
 class Renderer:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, assets: AssetManager):
         pygame.init()
         self.settings = settings
         self.screen = pygame.display.set_mode(settings.display.window_size)
         pygame.display.set_caption("Vertical Plane Slice Viewer")
-        self.assets = AssetManager()
-        self.font = self.assets.get_font('pixel_8')
+        self.assets = assets
+        self.font = {
+            8: self.assets.get_font('pixel_8'),
+            48: self.assets.get_font('pixel_48'),
+        }
         self.center_2D = (settings.display.window_size[0] // 2, 
                          settings.display.window_size[1] // 2)
 
@@ -110,13 +113,19 @@ class Renderer:
         angle_text = f"Plane Angle: {angle_degrees:.1f}°"
         points_text = f"Points: {points}"
 
-        text_surface1 = self.font.render(coord_text, True, (255, 255, 255))
-        text_surface2 = self.font.render(angle_text, True, (255, 255, 255))
-        text_surface3 = self.font.render(points_text, True, (255, 255, 255))
+        text_surface1 = self.font[8].render(coord_text, True, (255, 255, 255))
+        text_surface2 = self.font[8].render(angle_text, True, (255, 255, 255))
+        text_surface3 = self.font[8].render(points_text, True, (255, 255, 255))
         
         self.screen.blit(text_surface1, (10, 10))
-        self.screen.blit(text_surface2, (10, 30))
-        self.screen.blit(text_surface3, (10, 50))
+        self.screen.blit(text_surface2, (10, 20))
+        self.screen.blit(text_surface3, (10, 30))
+
+    def render_win_message(self):
+        """Draw centered win message overlay and wait for input"""
+        self._render_win_message()
+        self.update_display()
+        pygame.event.clear()
 
     def _render_win_message(self):
         """Draw centered win message overlay"""
@@ -127,8 +136,7 @@ class Renderer:
         self.screen.blit(overlay, (0,0))
         
         # Win message
-        font = pygame.font.SysFont(None, 64)
-        text = font.render("Level Complete!", True, (255, 215, 0))
+        text = self.font[48].render("Level Complete!", True, (255, 215, 0))
         text_rect = text.get_rect(center=(self.settings.display.window_size[0]/2,
                                         self.settings.display.window_size[1]/2))
         self.screen.blit(text, text_rect)

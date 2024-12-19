@@ -10,7 +10,7 @@ class GameState(Enum):
     HIGH_SCORES = auto()
     
 class LevelManager:
-    def __init__(self, start_level=1):
+    def __init__(self, start_level=None):
         self.current_level = start_level
         self.level_folder = 'v6/levels'
         

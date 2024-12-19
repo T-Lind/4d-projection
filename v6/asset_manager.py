@@ -24,7 +24,8 @@ class AssetManager:
             'pixel_8': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 8),
             'pixel_16': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 16),
             'pixel_24': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 24),
-
+            'pixel_48': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 48),
+            'pixel_64': pygame.font.Font(os.path.join(self.base_path, 'fonts', 'pixel.ttf'), 64),
         }
         
     def _init_sounds(self):
@@ -33,7 +34,8 @@ class AssetManager:
             'jump': 'jump.wav',
             'collision': 'collision.ogg',
             'complete': 'complete.wav',
-            'select': 'select.mp3',
+            'select': 'select.wav',
+            'highlight': 'highlight.wav',
             'music': 'background.mp3',
             'death': 'death.wav',
         }
