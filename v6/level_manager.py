@@ -1,5 +1,14 @@
 import os
+from enum import Enum, auto
 
+class GameState(Enum):
+    MAIN_MENU = auto()
+    GAME = auto()
+    PAUSE = auto()
+    LEVEL_COMPLETE = auto()
+    GAME_OVER = auto()
+    HIGH_SCORES = auto()
+    
 class LevelManager:
     def __init__(self, start_level=1):
         self.current_level = start_level

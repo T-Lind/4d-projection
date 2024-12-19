@@ -5,7 +5,9 @@ from typing import List, Tuple, Dict
 from settings import Settings
 from geometry import GeometryHelper
 from renderer import Renderer
-from level_manager import LevelManager
+from level_manager import LevelManager, GameState
+# from menu_manager import MenuManager
+from asset_manager import AssetManager
 
 class PlaneSliceViewer:
     def __init__(self, settings: Settings, level_manager: LevelManager):
@@ -13,6 +15,8 @@ class PlaneSliceViewer:
         self.level_manager = level_manager
         self.renderer = Renderer(settings)
         self.geometry = GeometryHelper()
+        self.assets = AssetManager()
+        self.assets.play_music()
         
         # State
         self.running = True
@@ -50,6 +54,7 @@ class PlaneSliceViewer:
         """Check if player has fallen below threshold"""
         if self.user_pos[2] < self.settings.gameplay.fall_threshold:
             self._reset_player()
+            self.assets.play_sound('death')
             self.points -= self.death_penalty
             
     def _reset_player(self):
@@ -113,14 +118,13 @@ class PlaneSliceViewer:
         self.renderer.render_win_message()
         self.renderer.update_display()
         waiting = True
+        self.assets.play_sound('complete')
         while waiting:
             for event in pygame.event.get():
                 if event.type == KEYDOWN and event.key == K_RETURN:
                     waiting = False
-                elif event.type == QUIT:
-                    self.running = False
-                    waiting = False
         self.running = False
+
 
     def _update_physics(self):
         movement_acceleration = np.array([0.0, 0.0, -self.settings.movement.gravity], dtype=float)
@@ -129,6 +133,7 @@ class PlaneSliceViewer:
         if (self.keys_pressed[K_SPACE] or self.keys_pressed[K_w]) and self.ground_contact:
             self.velocity[2] = self.settings.movement.jump_velocity
             self.ground_contact = False
+            self.assets.play_sound('jump')
 
         if self.keys_pressed[K_s]:
             movement_acceleration[2] -= self.settings.movement.acceleration
@@ -201,6 +206,7 @@ class PlaneSliceViewer:
             self.intersection_edges.append(edges)
 
     def _update(self):
+        dt = 1/60  # Fixed timestep
         if not self.level_complete:
             self._update_physics()
             self._check_fall_condition()
