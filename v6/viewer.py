@@ -16,9 +16,9 @@ class PlaneSliceViewer:
         self.renderer = Renderer(settings, assets)
         self.geometry = GeometryHelper()
         self.assets = assets
+        self.return_to_main_menu = False
         self.state = GameState.GAME
         self.menu = MenuManager(level_manager, assets, in_game=True)
-        self.assets.play_music()
         
         # State
         self.running = True
@@ -102,13 +102,12 @@ class PlaneSliceViewer:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self._pause_game()
+                if event.key in self.keys_pressed:
+                    self.keys_pressed[event.key] = True
+            elif event.type == pygame.KEYUP:
+                if event.key in self.keys_pressed:
+                    self.keys_pressed[event.key] = False
 
-            if event.type == KEYDOWN and event.key in self.keys_pressed:
-                self.keys_pressed[event.key] = True
-                if event.key == K_SPACE or event.key == K_w:
-                    self.points -= self.jump_penalty
-            elif event.type == KEYUP and event.key in self.keys_pressed:
-                self.keys_pressed[event.key] = False
             
             if event.type == MOUSEBUTTONDOWN:
                 if event.button == 4:  # Scroll up
@@ -124,11 +123,15 @@ class PlaneSliceViewer:
         self.state = GameState.PAUSE
         self.menu.run_pause_menu(self.renderer.screen)
         if self.menu.resume_game:
-            self.state = GameState.GAME
+            self._resume_game()
         elif self.menu.return_to_main:
+            self.return_to_main_menu = True
             self.running = False
-            self.level_complete = False
-            self.level_manager.current_level = None  # This can signal main.py to show main menu
+
+    def _resume_game(self):
+        self.state = GameState.GAME
+        # Reset keys to allow pausing again
+        self.keys_pressed = {key: False for key in self.keys_pressed}
 
 
     def _handle_level_completion(self):
@@ -278,4 +281,5 @@ class PlaneSliceViewer:
                 pygame.display.flip()
                 self.clock.tick(60)
             elif self.state == GameState.PAUSE:
-                pygame.time.delay(100)
+                self._handle_events()
+                self.clock.tick(60)

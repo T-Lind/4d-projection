@@ -36,7 +36,8 @@ class AssetManager:
             'complete': 'complete.wav',
             'select': 'select.wav',
             'highlight': 'highlight.wav',
-            'music': 'background.mp3',
+            'music': 'music.mp3',
+            'menu': 'menu.mp3',
             'death': 'death.wav',
         }
         
