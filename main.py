@@ -407,7 +407,7 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.update_camera()
 
         # Update debug text. Assume player's 4D position is (x, y, z, 0)
-        debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg")
+        debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg\n")
         self.debug_label.setText(debug_text)
 
     def wheelEvent(self, event):

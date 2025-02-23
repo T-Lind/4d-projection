@@ -1,57 +1,30 @@
-# 4D Shape Visualizer
+# 4D Shape Intersection Visualizer
 
-![Tesseract Rotation](tesseract-with-lighting.gif)
+This project visualizes the intersection of 4D shapes with a dynamic 3D hyperplane. The program loads one or more 4D shapes from a JSON file, computes the intersection with a hyperplane that rotates about the W–Z plane, projects the resulting intersection into 3D, and renders it using OpenGL with proper lighting, face shading, and edge drawing. In addition, it implements FPS-style controls so you can freely navigate the 3D world.
 
-A Python application for visualizing and interacting with 4-dimensional geometric shapes in real-time.
+![4D Example Demo](4d-example-full.gif)
 
 ## Features
-- Load and display 4D shapes from `.4ds` files
-- Real-time 4D and 3D rotations
-- Interactive W-slice control for 4D cross sections
-- Translucent face rendering
-- Shape translation in viewing space
 
-## Controls
-- **4D Rotations**
-  - Q/W: First 4D plane
-  - A/S: Second 4D plane
-  - Z/X: Third 4D plane
-
-- **3D Rotations**
-  - R/T: X axis
-  - F/G: Y axis
-  - V/B: Z axis
-
-- **Navigation**
-  - Arrow Keys: Translation
-  - Page Up/Down: Vertical movement
-  - Up/Down: W-slice control
+- **Multi-Shape Support:** Load multiple 4D shapes from a JSON file. Each shape can have its own color and an optional position offset.
+- **Dynamic Hyperplane:** The 3D hyperplane is defined in 4D and rotates about the W–Z plane. Use the mouse wheel to adjust the rotation.
+- **Projection & Intersection:** For each shape, the program computes the intersection of its edges with a hyperplane, projects the 4D intersection points to 3D, and then creates a convex hull.
+- **Rendering:** The 3D shape is rendered with ambient/diffuse lighting, proper face shading, and edge highlighting.
+- **FPS-Style Controls:** Use keyboard controls for smooth continuous movement (translation and rotation) and zooming.
+- **Demo:** A demo file (`4d-example-full.gif`) is provided to showcase an example of the visualization.
 
 ## Installation
+
+This project requires Python 3.11+ and the following packages:
+
+- `numpy`
+- `scipy`
+- `PyQt5`
+- `pyqtgraph`
+- `PyOpenGL`
+
+You can install all dependencies using pip:
+
 ```bash
-pip install pygame numpy
+pip install -r requirements.txt
 ```
-
-## Usage
-1. Place .4ds shape files in the shapes/ directory
-2. Run the visualizer:
-```bash
-python main.py
-```
-
-## Shape File Format
-Shapes are defined in .4ds JSON files containing:
-
-* vertices: 4D coordinates
-& edges: vertex connections
-& faces: polygonal face definitions
-& face_colors: RGBA values for each face
-
-## Examples
-* tesseract.4ds: 4D hypercube
-* pentachoron.4ds: 4D simplex (triangular pyramid)
-
-## Requirements
-* Python 3.7+
-* pygame
-* numpy
