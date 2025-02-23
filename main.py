@@ -9,7 +9,6 @@ import pyqtgraph.opengl as gl
 from pyqtgraph.opengl import MeshData
 from OpenGL.GL import glEnable, glLightfv, GL_DEPTH_TEST, GL_LIGHTING, GL_LIGHT0, GL_AMBIENT, GL_DIFFUSE, GL_POSITION
 
-
 # --------------------------
 # JSON Loading (with optional position)
 # --------------------------
@@ -35,7 +34,6 @@ def load_shapes_json(filename):
         shapes.append((vertices, color))
     return shapes
 
-
 # --------------------------
 # Geometry Functions
 # --------------------------
@@ -52,7 +50,6 @@ def get_tesseract_edges(vertices):
             if np.count_nonzero(diff > 1e-6) == 1:
                 edges.append((vertices[i], vertices[j]))
     return edges
-
 
 def hyperplane_intersection(P, Q, a, b, c, d, e_val):
     """
@@ -79,7 +76,6 @@ def hyperplane_intersection(P, Q, a, b, c, d, e_val):
     I = P + t * (Q - P)
     return I
 
-
 def find_intersection_points(vertices, a, b, c, d, e_val):
     """
     For a given set of 4D vertices and a hyperplane,
@@ -103,7 +99,6 @@ def find_intersection_points(vertices, a, b, c, d, e_val):
         if not any(np.linalg.norm(pt - up) < 1e-6 for up in unique_points):
             unique_points.append(pt)
     return unique_points
-
 
 def project_to_3d(points, a, b, c, d, e_val):
     """
@@ -152,7 +147,6 @@ def project_to_3d(points, a, b, c, d, e_val):
         projected_points.append(coords)
     return np.array(projected_points), basis, x0
 
-
 def create_convex_hull_mesh(projected_points):
     """
     Compute the convex hull of the projected 3D points.
@@ -164,9 +158,9 @@ def create_convex_hull_mesh(projected_points):
     faces = hull.simplices  # Triangular faces
     return projected_points, faces
 
-
 # --------------------------
-# Custom OpenGL Widget with FPS-style controls, momentum, and improved edge rendering
+# Custom OpenGL Widget with FPS-style controls, momentum, improved edge rendering,
+# plus floor and collision handling (including a bounding volume for the user)
 # --------------------------
 class CustomGLViewWidget(gl.GLViewWidget):
     def __init__(self, shapes, *args, **kwargs):
@@ -180,14 +174,16 @@ class CustomGLViewWidget(gl.GLViewWidget):
         #  - "vertices": the list of 4D vertices,
         #  - "color": face color,
         #  - "mesh_item": GLMeshItem (initially None),
-        #  - "edge_item": GLLinePlotItem (initially None).
+        #  - "edge_item": GLLinePlotItem (initially None),
+        #  - "convex_vertices": the last computed 3D convex hull vertices.
         self.shape_items = []
         for vertices, color in shapes:
             self.shape_items.append({
                 "vertices": vertices,
                 "color": color,
                 "mesh_item": None,
-                "edge_item": None
+                "edge_item": None,
+                "convex_vertices": None
             })
 
         self.theta = 3  # Hyperplane rotation about the W-Z plane.
@@ -213,10 +209,25 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.setWindowTitle('3D Intersection of Multiple 4D Shapes and Hyperplane')
         # We are managing our own camera, so we won't use self.opts['distance'].
 
-        # Add a grid for reference.
-        self.grid = gl.GLGridItem()
-        self.grid.scale(1, 1, 1)
-        self.addItem(self.grid)
+        # Remove the grid and instead add a floor at z = -1.
+        floor_color = (0.2, 0.2, 0.2, 1.0)
+        floor_vertices = np.array([
+            [-100, -100, -1],
+            [ 100, -100, -1],
+            [ 100,  100, -1],
+            [-100,  100, -1]
+        ], dtype=float)
+        floor_faces = np.array([
+            [0, 1, 2],
+            [0, 2, 3]
+        ], dtype=int)
+        floor_meshdata = MeshData(vertexes=floor_vertices, faces=floor_faces)
+        self.floor_item = gl.GLMeshItem(meshdata=floor_meshdata,
+                                        shader='shaded',
+                                        smooth=True,
+                                        glOptions='opaque',
+                                        faceColor=floor_color)
+        self.addItem(self.floor_item)
 
         # Add a debug label overlay.
         self.debug_label = QtWidgets.QLabel(self)
@@ -238,8 +249,8 @@ class CustomGLViewWidget(gl.GLViewWidget):
         glEnable(GL_LIGHTING)
         glEnable(GL_LIGHT0)
         glEnable(GL_DEPTH_TEST)
-        glLightfv(GL_LIGHT0, GL_AMBIENT, (0.3, 0.3, 0.3, 1.0))
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, (0.7, 0.7, 0.7, 1.0))
+        glLightfv(GL_LIGHT0, GL_AMBIENT,  (0.3, 0.3, 0.3, 1.0))
+        glLightfv(GL_LIGHT0, GL_DIFFUSE,  (0.7, 0.7, 0.7, 1.0))
         glLightfv(GL_LIGHT0, GL_POSITION, (0, 10, 10, 1))
 
     def update_geometry(self):
@@ -271,11 +282,14 @@ class CustomGLViewWidget(gl.GLViewWidget):
                 if shape["edge_item"] is not None:
                     self.removeItem(shape["edge_item"])
                     shape["edge_item"] = None
+                shape["convex_vertices"] = None
                 continue
 
             # Project to 3D.
             projected_points, basis, x0 = project_to_3d(intersection_points, a, b, c, d, e_val)
             vertices_3d, faces = create_convex_hull_mesh(projected_points)
+            # Store the convex hull for collision purposes.
+            shape["convex_vertices"] = vertices_3d
 
             # Build MeshData.
             meshdata = MeshData(vertexes=vertices_3d, faces=faces)
@@ -358,7 +372,7 @@ class CustomGLViewWidget(gl.GLViewWidget):
                                elevation=self.elevation)
 
     def animate(self):
-        """Called regularly to update camera position/orientation with momentum."""
+        """Called regularly to update camera position/orientation with momentum and resolve collisions."""
         dt = 0.016  # ~16 ms per frame
         acceleration = np.array([0.0, 0.0, 0.0])
         angular_acc = np.array([0.0, 0.0])  # [yaw_acc, pitch_acc]
@@ -402,18 +416,49 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.angular_velocity *= 0.8
 
         self.camera_pos += self.velocity * dt
+
+        # --- Collision Resolution ---
+        # Floor collision: floor is now at z = -1, so ensure the camera stays above floor+eye_height (here 1 unit above floor).
+        floor_height = -1.0
+        min_camera_z = floor_height + 1.0  # i.e. 0.0
+        if self.camera_pos[2] < min_camera_z:
+            self.camera_pos[2] = min_camera_z
+
+        # User's collision radius (for the invisible bounding volume)
+        user_radius = 0.5
+
+        # 3D collision: for each shape, compute a 3D bounding sphere from its convex hull.
+        for shape in self.shape_items:
+            if shape["convex_vertices"] is not None:
+                vertices_3d = shape["convex_vertices"]
+                center = np.mean(vertices_3d, axis=0)
+                radii = np.linalg.norm(vertices_3d - center, axis=1)
+                shape_radius = np.max(radii)
+                diff = self.camera_pos - center
+                dist = np.linalg.norm(diff)
+                min_dist = user_radius + shape_radius
+                if dist < min_dist:
+                    if dist > 1e-6:
+                        penetration = min_dist - dist
+                        correction = (diff / dist) * penetration
+                        self.camera_pos += correction
+                    else:
+                        self.camera_pos[0] += min_dist
+
         self.azimuth += self.angular_velocity[0] * dt
         self.elevation = np.clip(self.elevation + self.angular_velocity[1] * dt, -89, 89)
         self.update_camera()
 
-        # Update debug text. Assume player's 4D position is (x, y, z, 0)
-        debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg\n")
+        # Update debug text.
+        debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg\n"
+                      f"Camera: {self.camera_pos}\n"
+                      f"Azimuth: {self.azimuth:.2f}, Elevation: {self.elevation:.2f}")
         self.debug_label.setText(debug_text)
 
     def wheelEvent(self, event):
         """
         Rotate the hyperplane about the W–Z plane when the mouse scroll wheel moves.
-        Each notch rotates theta by 0.1 radians.
+        Each notch rotates theta by 0.05 radians.
         """
         delta = event.angleDelta().y() / 120.0  # one step = 120 units
         self.theta += delta * 0.05
@@ -437,7 +482,6 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.keysDown[event.key()] = False
         event.accept()
 
-
 # --------------------------
 # Main Execution
 # --------------------------
@@ -448,7 +492,6 @@ def main():
     view = CustomGLViewWidget(shapes)
     view.show()
     sys.exit(app.exec_())
-
 
 if __name__ == '__main__':
     main()
