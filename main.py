@@ -153,6 +153,9 @@ def create_convex_hull_mesh(projected_points):
 class CustomGLViewWidget(gl.GLViewWidget):
     def __init__(self, shapes, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Flag to track mouse capture status.
+        self.mouseCaptured = False
+
         self.shape_items = []
         for vertices, color in shapes:
             self.shape_items.append({
@@ -177,7 +180,6 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.angular_velocity = np.array([0.0, 0.0], dtype=float)
         self.keysDown = {}
         self.setWindowTitle('3D Intersection of Multiple 4D Shapes and Hyperplane')
-
         # Floor at z = -1.
         floor_color = (0.2, 0.2, 0.2, 1.0)
         floor_vertices = np.array([
@@ -197,7 +199,6 @@ class CustomGLViewWidget(gl.GLViewWidget):
 
         # For jump logic.
         self.can_jump = False
-        self.jump_normal = None  # will store the contact normal from the surface
 
         self.debug_label = QtWidgets.QLabel(self)
         self.debug_label.setStyleSheet("QLabel { background-color: rgba(0, 0, 0, 150); color: white; }")
@@ -320,10 +321,10 @@ class CustomGLViewWidget(gl.GLViewWidget):
         # Compute horizontal movement vectors (ignore pitch)
         yaw = np.radians(self.azimuth)
         horizontal_forward = np.array([np.cos(yaw), np.sin(yaw), 0.0])
-        horizontal_forward /= np.linalg.norm(horizontal_forward)
+        horizontal_forward = horizontal_forward / np.linalg.norm(horizontal_forward)
         horizontal_right = np.array([-np.sin(yaw), np.cos(yaw), 0.0])
 
-        # WASD for 2D movement.
+        # Use only horizontal vectors for WASD movement:
         if self.keysDown.get(Qt.Key_W, False):
             acceleration -= horizontal_forward
         if self.keysDown.get(Qt.Key_S, False):
@@ -346,13 +347,13 @@ class CustomGLViewWidget(gl.GLViewWidget):
 
         # --- Collision Resolution with Floor ---
         floor_height = -1.0
-        ground_level = floor_height + 1.0  # 0.0
+        ground_level = floor_height + 1.0  # i.e. 0.0
         if self.camera_pos[2] < ground_level:
             self.camera_pos[2] = ground_level
             if self.velocity[2] < 0:
                 self.velocity[2] = 0
 
-        if self.camera_pos[2] < -10:
+        if self.camera_pos[2] < -10:  # reset position if fallen too far
             self.camera_pos = np.array([10.0, 0.0, 10.0], dtype=float)
             self.velocity = np.zeros(3)
 
@@ -375,15 +376,12 @@ class CustomGLViewWidget(gl.GLViewWidget):
                         self.camera_pos[0] += min_dist
 
         # --- Surface Detection for Jumping ---
-        # Instead of checking for a sufficiently vertical normal, we allow jump if contact is detected.
         self.can_jump = False
-        self.jump_normal = None
-        # Check floor.
         if abs(self.camera_pos[2] - ground_level) < 0.05:
             self.can_jump = True
-            self.jump_normal = np.array([0, 0, 1], dtype=float)
         else:
-            normals = []
+            up_vector = np.array([0,0,1], dtype=float)
+            normal_threshold = 0.7
             for shape in self.shape_items:
                 if shape["convex_vertices"] is not None:
                     vertices_3d = shape["convex_vertices"]
@@ -395,22 +393,16 @@ class CustomGLViewWidget(gl.GLViewWidget):
                     min_dist = user_radius + shape_radius
                     if dist < min_dist + 0.05:
                         contact_normal = diff / (dist + 1e-6)
-                        normals.append(contact_normal)
-            if normals:
-                self.can_jump = True
-                # Average the contact normals.
-                avg_normal = np.mean(normals, axis=0)
-                self.jump_normal = avg_normal / (np.linalg.norm(avg_normal) + 1e-6)
+                        if np.dot(contact_normal, up_vector) > normal_threshold:
+                            self.can_jump = True
+                            break
 
         self.update_camera()
-
-        # --- Update Debug Overlay ---
         debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg\n"
                       f"Camera pos: ({self.camera_pos[0]:.2f}, {self.camera_pos[1]:.2f}, {self.camera_pos[2]:.2f})\n"
                       f"Velocity: ({self.velocity[0]:.2f}, {self.velocity[1]:.2f}, {self.velocity[2]:.2f})\n"
                       f"Azimuth: {self.azimuth:.2f}, Elevation: {self.elevation:.2f}\n"
-                      f"Can Jump: {self.can_jump}\n"
-                      f"Jump Normal: {self.jump_normal if self.jump_normal is not None else 'None'}")
+                      f"Can Jump: {self.can_jump}")
         self.debug_label.setText(debug_text)
 
     def wheelEvent(self, event):
@@ -420,6 +412,11 @@ class CustomGLViewWidget(gl.GLViewWidget):
         event.accept()
 
     def mousePressEvent(self, event):
+        # On left-click, grab the mouse if not already captured.
+        if event.button() == Qt.LeftButton and not self.mouseCaptured:
+            self.grabMouse()
+            self.setCursor(Qt.BlankCursor)
+            self.mouseCaptured = True
         self.last_mouse_pos = event.pos()
         event.accept()
 
@@ -428,7 +425,6 @@ class CustomGLViewWidget(gl.GLViewWidget):
             self.last_mouse_pos = event.pos()
         delta = event.pos() - self.last_mouse_pos
         sensitivity = 0.2
-        # Inverted mouse look.
         self.azimuth -= delta.x() * sensitivity
         self.elevation += delta.y() * sensitivity
         self.elevation = np.clip(self.elevation, -89, 89)
@@ -436,15 +432,20 @@ class CustomGLViewWidget(gl.GLViewWidget):
         event.accept()
 
     def keyPressEvent(self, event):
-        key = event.key()
-        if key == Qt.Key_Space:
-            # Jump using the contact normal regardless of its angle.
-            if self.can_jump and self.jump_normal is not None:
-                jump_impulse = 50.0
-                self.velocity += jump_impulse * self.jump_normal
+        # On Esc, release the mouse if it is captured.
+        if event.key() == Qt.Key_Escape and self.mouseCaptured:
+            self.releaseMouse()
+            self.unsetCursor()
+            self.mouseCaptured = False
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_Space:
+            if self.can_jump:
+                self.velocity[2] = 55.0
                 self.can_jump = False
         else:
-            self.keysDown[key] = True
+            self.keysDown[event.key()] = True
         event.accept()
 
     def keyReleaseEvent(self, event):
