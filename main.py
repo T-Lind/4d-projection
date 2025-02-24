@@ -177,6 +177,7 @@ class CustomGLViewWidget(gl.GLViewWidget):
         self.angular_velocity = np.array([0.0, 0.0], dtype=float)
         self.keysDown = {}
         self.setWindowTitle('3D Intersection of Multiple 4D Shapes and Hyperplane')
+
         # Floor at z = -1.
         floor_color = (0.2, 0.2, 0.2, 1.0)
         floor_vertices = np.array([
@@ -196,6 +197,7 @@ class CustomGLViewWidget(gl.GLViewWidget):
 
         # For jump logic.
         self.can_jump = False
+        self.jump_normal = None  # will store the contact normal from the surface
 
         self.debug_label = QtWidgets.QLabel(self)
         self.debug_label.setStyleSheet("QLabel { background-color: rgba(0, 0, 0, 150); color: white; }")
@@ -314,36 +316,37 @@ class CustomGLViewWidget(gl.GLViewWidget):
         dt = 0.016
         acceleration = np.array([0.0, 0.0, 0.0])
         angular_acc = np.array([0.0, 0.0])
+
+        # Compute horizontal movement vectors (ignore pitch)
         yaw = np.radians(self.azimuth)
-        pitch = np.radians(self.elevation)
-        forward = np.array([np.cos(pitch)*np.cos(yaw),
-                            np.cos(pitch)*np.sin(yaw),
-                            np.sin(pitch)])
-        right = np.cross(forward, np.array([0,0,1]))
-        if np.linalg.norm(right) < 1e-6:
-            right = np.array([1,0,0])
-        right /= np.linalg.norm(right)
-        up = np.array([0,0,1], dtype=float)
+        horizontal_forward = np.array([np.cos(yaw), np.sin(yaw), 0.0])
+        horizontal_forward /= np.linalg.norm(horizontal_forward)
+        horizontal_right = np.array([-np.sin(yaw), np.cos(yaw), 0.0])
+
+        # WASD for 2D movement.
         if self.keysDown.get(Qt.Key_W, False):
-            acceleration -= forward
+            acceleration -= horizontal_forward
         if self.keysDown.get(Qt.Key_S, False):
-            acceleration += forward
+            acceleration += horizontal_forward
         if self.keysDown.get(Qt.Key_A, False):
-            acceleration += right
+            acceleration -= horizontal_right
         if self.keysDown.get(Qt.Key_D, False):
-            acceleration -= right
+            acceleration += horizontal_right
+
         self.velocity += acceleration * self.moveSpeed * dt
         self.angular_velocity += angular_acc * self.rotateSpeed * dt
         self.velocity *= 0.9
         self.angular_velocity *= 0.8
-        # Apply stronger gravity.
-        gravity = -20.0
+
+        # Apply gravity.
+        gravity = -80.0
         self.velocity[2] += gravity * dt
+
         self.camera_pos += self.velocity * dt
 
         # --- Collision Resolution with Floor ---
         floor_height = -1.0
-        ground_level = floor_height + 1.0  # i.e. 0.0
+        ground_level = floor_height + 1.0  # 0.0
         if self.camera_pos[2] < ground_level:
             self.camera_pos[2] = ground_level
             if self.velocity[2] < 0:
@@ -372,14 +375,15 @@ class CustomGLViewWidget(gl.GLViewWidget):
                         self.camera_pos[0] += min_dist
 
         # --- Surface Detection for Jumping ---
-        # We'll set self.can_jump if either on floor or on a shape with a sufficiently vertical contact normal.
+        # Instead of checking for a sufficiently vertical normal, we allow jump if contact is detected.
         self.can_jump = False
+        self.jump_normal = None
         # Check floor.
         if abs(self.camera_pos[2] - ground_level) < 0.05:
             self.can_jump = True
+            self.jump_normal = np.array([0, 0, 1], dtype=float)
         else:
-            up_vector = np.array([0,0,1], dtype=float)
-            normal_threshold = 0.7
+            normals = []
             for shape in self.shape_items:
                 if shape["convex_vertices"] is not None:
                     vertices_3d = shape["convex_vertices"]
@@ -389,19 +393,24 @@ class CustomGLViewWidget(gl.GLViewWidget):
                     diff = self.camera_pos - center
                     dist = np.linalg.norm(diff)
                     min_dist = user_radius + shape_radius
-                    if dist < min_dist + 0.05:  # small tolerance
+                    if dist < min_dist + 0.05:
                         contact_normal = diff / (dist + 1e-6)
-                        if np.dot(contact_normal, up_vector) > normal_threshold:
-                            self.can_jump = True
-                            break
+                        normals.append(contact_normal)
+            if normals:
+                self.can_jump = True
+                # Average the contact normals.
+                avg_normal = np.mean(normals, axis=0)
+                self.jump_normal = avg_normal / (np.linalg.norm(avg_normal) + 1e-6)
 
         self.update_camera()
+
         # --- Update Debug Overlay ---
         debug_text = (f"Plane angle: {np.degrees(self.theta):.2f} deg\n"
-                      f"Camera pos: {self.camera_pos}\n"
-                      f"Velocity: {self.velocity}\n"
+                      f"Camera pos: ({self.camera_pos[0]:.2f}, {self.camera_pos[1]:.2f}, {self.camera_pos[2]:.2f})\n"
+                      f"Velocity: ({self.velocity[0]:.2f}, {self.velocity[1]:.2f}, {self.velocity[2]:.2f})\n"
                       f"Azimuth: {self.azimuth:.2f}, Elevation: {self.elevation:.2f}\n"
-                      f"Can Jump: {self.can_jump}")
+                      f"Can Jump: {self.can_jump}\n"
+                      f"Jump Normal: {self.jump_normal if self.jump_normal is not None else 'None'}")
         self.debug_label.setText(debug_text)
 
     def wheelEvent(self, event):
@@ -429,10 +438,11 @@ class CustomGLViewWidget(gl.GLViewWidget):
     def keyPressEvent(self, event):
         key = event.key()
         if key == Qt.Key_Space:
-            # Jump only if surface contact is detected.
-            if self.can_jump:
-                self.velocity[2] = 35.0  # increased jump impulse
-                self.can_jump = False  # disable further jumping until contact is re-established
+            # Jump using the contact normal regardless of its angle.
+            if self.can_jump and self.jump_normal is not None:
+                jump_impulse = 50.0
+                self.velocity += jump_impulse * self.jump_normal
+                self.can_jump = False
         else:
             self.keysDown[key] = True
         event.accept()
